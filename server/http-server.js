@@ -28,6 +28,7 @@ const MAX_BODY_SIZE = 50 * 1024 * 1024;
 
 let httpsServer = null;
 let httpsPort = DEFAULT_HTTPS_PORT;
+let routerEnabled = false;
 
 // ============================================================
 // CAMINHOS PUBLICOS
@@ -43,6 +44,19 @@ function getPublicRoot() {
     return publicRoot;
 }
 
+function setRouter(enabled) {
+    routerEnabled = enabled;
+}
+
+// ============================================================
+// FRONT CONTROLLER (URL AMIGAVEL)
+// ============================================================
+
+function resolveFrontController() {
+    const frontController = path.join(getPublicRoot(), 'index.php');
+    return exists(frontController) ? frontController : null;
+}
+
 // ============================================================
 // CORS ORIGIN (BUG FIX: restrito em vez de *)
 // ============================================================
@@ -52,24 +66,19 @@ function getCorsOrigin() {
 }
 
 // ============================================================
-// HEADERS PERMITIDOS PARA CGI (BUG FIX: whitelist)
+// HEADERS BLOQUEADOS PARA CGI (blacklist)
+//
+// Seguindo o padrao de Apache/Nginx que passam todos os headers.
+// Apenas headers perigosos conhecidos sao bloqueados.
 // ============================================================
 
-const CGI_HEADER_WHITELIST = new Set([
-    'accept',
-    'accept-charset',
-    'accept-encoding',
-    'accept-language',
-    'authorization',
-    'cache-control',
-    'cookie',
-    'host',
-    'if-modified-since',
-    'if-none-match',
-    'if-range',
-    'pragma',
-    'referer',
-    'user-agent'
+const CGI_HEADER_BLACKLIST = new Set([
+    'proxy',
+    'proxy-connection',
+    'x-forwarded-for',
+    'x-forwarded-host',
+    'x-forwarded-proto',
+    'x-real-ip'
 ]);
 
 // ============================================================
@@ -118,7 +127,7 @@ function readRequestBody(req) {
 // BUG FIX: whitelist de headers ao inves de passar todos
 // ============================================================
 
-function createCgiParameters(req, filePath, serverPort) {
+function createCgiParameters(req, filePath, serverPort, isRouted) {
     const host = req.headers.host || 'localhost';
 
     let url;
@@ -134,16 +143,13 @@ function createCgiParameters(req, filePath, serverPort) {
         SERVER_PROTOCOL: `HTTP/${req.httpVersion}`,
         REQUEST_METHOD: req.method,
         REQUEST_URI: req.url,
-        DOCUMENT_URI: url.pathname,
-        SCRIPT_NAME: url.pathname,
+        SCRIPT_NAME: isRouted ? '/index.php' : url.pathname,
         SCRIPT_FILENAME: filePath,
         DOCUMENT_ROOT: getPublicRoot(),
         QUERY_STRING: url.searchParams.toString(),
         SERVER_NAME: host.split(':')[0],
         SERVER_PORT: String(serverPort),
         REMOTE_ADDR: req.socket.remoteAddress || '127.0.0.1',
-        REMOTE_PORT: String(req.socket.remotePort || ''),
-        REQUEST_SCHEME: 'https',
         HTTPS: 'on',
         REDIRECT_STATUS: '200'
     };
@@ -156,13 +162,13 @@ function createCgiParameters(req, filePath, serverPort) {
         params.CONTENT_LENGTH = req.headers['content-length'];
     }
 
-    // BUG FIX: apenas headers da whitelist sao passados ao PHP
+    // Headers da blacklist sao bloqueados, o resto passa livremente
     for (const [name, value] of Object.entries(req.headers)) {
         if (name === 'content-type' || name === 'content-length') {
             continue;
         }
 
-        if (!CGI_HEADER_WHITELIST.has(name.toLowerCase())) {
+        if (CGI_HEADER_BLACKLIST.has(name.toLowerCase())) {
             continue;
         }
 
@@ -215,10 +221,10 @@ function resolvePublicPath(requestPath) {
 // BUG FIX: error.message NAO e mais exposta ao cliente
 // ============================================================
 
-async function executePhp(req, res, filePath, serverPort) {
+async function executePhp(req, res, filePath, serverPort, isRouted) {
     try {
         const body = await readRequestBody(req);
-        const params = createCgiParameters(req, filePath, serverPort);
+        const params = createCgiParameters(req, filePath, serverPort, isRouted);
 
         const result = await executeFastCGI({
             host: '127.0.0.1',
@@ -365,6 +371,15 @@ async function handleRequest(req, res) {
     const served = await serveStatic(req, res, filePath);
     if (served) return;
 
+    // ROUTER: fallback para front controller (URL Amigavel)
+    if (routerEnabled) {
+        const frontController = resolveFrontController();
+        if (frontController) {
+            await executePhp(req, res, frontController, httpsPort, true);
+            return;
+        }
+    }
+
     // 404
     res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(`<!DOCTYPE html>
@@ -488,5 +503,6 @@ module.exports = {
     startHttpsServer,
     stopHttps,
     setPublicRoot,
-    getHttpsPort
+    getHttpsPort,
+    setRouter
 };

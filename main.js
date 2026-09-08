@@ -12,7 +12,8 @@ const {
     startHttpsServer,
     stopHttps,
     setPublicRoot,
-    getHttpsPort
+    getHttpsPort,
+    setRouter
 } = require('./server/http-server');
 const { setDebugEnabled, log: loggerLog } = require('./server/logger');
 
@@ -86,13 +87,13 @@ let shuttingDown = false;
 
 function getApplicationRoot() {
     if (app.isPackaged) {
-        return path.join(process.resourcesPath, 'app');
+        return path.join(process.resourcesPath, 'app', 'public');
     }
     return __dirname;
 }
 
 function getPublicRoot() {
-    return path.join(getApplicationRoot(), 'app');
+    return path.join(getApplicationRoot(), 'app', 'public');
 }
 
 function getResourcesRoot() {
@@ -163,6 +164,11 @@ async function startMiPhantServer(win) {
 
         // 3. Public root
         setPublicRoot(getPublicRoot());
+
+        // 3.1 Router (URL Amigavel)
+        if (config.server && config.server.router) {
+            setRouter(true);
+        }
 
         // 4. PHP
         await startPhp(getResourcesRoot(), app.getPath('userData'));

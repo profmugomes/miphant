@@ -65,6 +65,45 @@ Electron (Renderer) → Node.js (Main) → HTTPS Server → FastCGI → PHP
 | `php/php.ini` | INI | Configurações do PHP |
 | `electron-builder.yml` | YAML | Configuração de build |
 
+### Estrutura de `app/config.json`
+
+```json
+{
+  "app": {
+    "id": "miphant",
+    "name": "MiPhant",
+    "version": "5.0.0",
+    "width": 800,
+    "height": 600,
+    "resizable": true,
+    "frame": true,
+    "hide": false,
+    "icon": "miphant.png",
+    "disableAccelerationHardware": true
+  },
+  "server": {
+    "perm": false,
+    "router": false
+  },
+  "dev": {
+    "menu": true,
+    "tools": false
+  }
+}
+```
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `app.width` | number | Largura da janela |
+| `app.height` | number | Altura da janela |
+| `app.resizable` | boolean | Permite redimensionar |
+| `app.frame` | boolean | Mostra barra de título |
+| `app.hide` | boolean | Inicia oculta |
+| `server.perm` | boolean | Permissões de administrador |
+| `server.router` | boolean | URL routing (front controller pattern) para frameworks PHP |
+| `dev.menu` | boolean | Mostra menu de desenvolvimento |
+| `dev.tools` | boolean | Abre DevTools automaticamente |
+
 ### Estrutura de Diretórios
 
 ```
@@ -177,19 +216,66 @@ echo '<script>window.location.assign("page.php");</script>';
 |---|---|---|
 | `GATEWAY_INTERFACE` | `CGI/1.1` | Versão CGI |
 | `SERVER_SOFTWARE` | `MiPhant` | Nome do servidor |
+| `SERVER_PROTOCOL` | `HTTP/1.1` | Versão do protocolo |
 | `REQUEST_METHOD` | `GET` | Método HTTP |
-| `REQUEST_URI` | `/page.php` | URI original |
+| `REQUEST_URI` | `/page.php` | URI original (com query string) |
+| `SCRIPT_NAME` | `/page.php` | Nome do script (ajustado para `/index.php` quando roteado) |
 | `SCRIPT_FILENAME` | `/full/path/page.php` | Caminho do arquivo PHP |
 | `DOCUMENT_ROOT` | `/path/to/app` | Raiz do documento |
 | `QUERY_STRING` | `key=value` | Parâmetros GET |
+| `SERVER_NAME` | `localhost` | Nome do servidor |
 | `SERVER_PORT` | `8443` | Porta do servidor |
+| `REMOTE_ADDR` | `127.0.0.1` | IP do cliente |
 | `HTTPS` | `on` | Indica HTTPS |
+| `REDIRECT_STATUS` | `200` | Status de redirecionamento |
 | `HTTP_*` | `HTTP_COOKIE=...` | Headers HTTP (whitelist) |
 
-### Headers Whitelist (HTTP_*)
+### Headers CGI (Blacklist)
 
-Apenas estes headers são passados ao PHP:
-`accept`, `accept-charset`, `accept-encoding`, `accept-language`, `authorization`, `cache-control`, `cookie`, `host`, `if-modified-since`, `if-none-match`, `if-range`, `pragma`, `referer`, `user-agent`
+Seguindo o padrão de Apache/Nginx, todos os headers HTTP são passados ao PHP como variáveis `HTTP_*`. Apenas headers perigosos conhecidos são bloqueados:
+
+| Header | Motivo do bloqueio |
+|---|---|
+| `proxy` | Vulnerabilidade httpoxy |
+| `proxy-connection` | Controle de proxy |
+| `x-forwarded-for` | Pode ser forjado para falsificar IP |
+| `x-forwarded-host` | Pode ser forjado para falsificar host |
+| `x-forwarded-proto` | Pode ser forjado para forçar HTTPS |
+| `x-real-ip` | Pode ser forjado para falsificar IP |
+
+### URL Routing (Front Controller)
+
+Quando `server.router = true` no `app/config.json`, URLs que não correspondem a arquivos físicos são roteadas para `index.php` (front controller). Isso permite frameworks PHP como Laravel, Symfony, CodeIgniter, Slim, WordPress, etc.
+
+**Fluxo:**
+
+```
+Request: GET /dashboard
+   │
+   ├─ Arquivo físico existe? → SIM → servir diretamente
+   │
+   └─ Não existe → router habilitado?
+      ├─ SIM → executar index.php (REQUEST_URI preservada)
+      └─ NÃO → 404
+```
+
+**Parâmetros CGI quando roteado (`isRouted = true`):**
+
+| Parâmetro | Valor | Observação |
+|---|---|---|
+| `SCRIPT_FILENAME` | `/path/public/index.php` | Aponta para o front controller |
+| `SCRIPT_NAME` | `/index.php` | Ajustado automaticamente |
+| `REQUEST_URI` | `/dashboard` | URL original preservada |
+
+**Exemplos de compatibilidade:**
+
+| Framework | Front Controller | Funciona? |
+|---|---|---|
+| Laravel | `public/index.php` | ✅ |
+| Symfony | `public/index.php` | ✅ |
+| CodeIgniter | `public/index.php` | ✅ |
+| Slim | `public/index.php` | ✅ |
+| WordPress | `index.php` | ✅ |
 
 ---
 
