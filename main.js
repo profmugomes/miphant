@@ -1,24 +1,27 @@
 // Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>
 // SPDX-License-Identifier: MIT
 
-const { app, BrowserWindow, Menu, MenuItem, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, MenuItem, ipcMain, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const sOS = require('os');
 const { spawn } = require('child_process');
-const sHttp = require('http');
+const { createSelfSignedCertificate } = require('./server/certificates');
+const { startPhp, stopPhp } = require('./server/php-manager');
+const {
+    startHttpsServer,
+    stopHttps,
+    setPublicRoot,
+    getHttpsPort
+} = require('./server/http-server');
+const { setDebugEnabled, log: loggerLog } = require('./server/logger');
 
 const sPlatform = sOS.platform().toLowerCase();
 const miphantPath = app.getAppPath().replace('app.asar', '');
 
 // Argumentos
 let sArgs = process.argv;
-let sArgv = '';
-if (sArgs[1] == '.') {
-    sArgv = sArgs.slice(2).toString();
-} else {
-    sArgv = sArgs.slice(1).toString();
-}
+let sArgv = (sArgs[1] == '.') ? sArgs.slice(2).toString() : sArgs.slice(1).toString();
 
 const milangs = require(path.join(app.getAppPath(), '/milang.js'));
 const milang = new milangs(sPlatform, miphantPath);
@@ -52,8 +55,6 @@ if (!fs.existsSync(miphantIcon)) {
 
 let sStartApp = true;
 let sServerName;
-let miphantserverProcess;
-let sPort;
 
 function createMenu(sWin, sFileMenu) {
     if (fs.existsSync(path.join(miphantPath, '/app/menus/', `${sFileMenu}.json`))) {
@@ -74,125 +75,121 @@ function createMenu(sWin, sFileMenu) {
 }
 
 const createWindow = () => {
-    miphantNewWindow('', config.app.largura, config.app.altura, config.app.redimensionar, config.app.quadro, false);
+    miphantNewWindow('', config.app.width, config.app.height, config.app.resizable, config.app.frame, config.app.hide);
 }
 
-// Aplica permissão de execução para o PHP
-function perm(filephp) {
-    if (config.server.perm) {
-        spawn('chmod', ['+x', filephp]);
-        config.server.perm = false;
+let shuttingDown = false;
 
-        fs.writeFileSync(path.join(miphantPath, '/app/config.json'), JSON.stringify(config, '', "\t"));
+// ============================================================
+// CAMINHOS
+// ============================================================
 
-        console.log(milang.traduzir('Applied execution permission to the %s', path.basename(filephp)));
+function getApplicationRoot() {
+    if (app.isPackaged) {
+        return path.join(process.resourcesPath, 'app');
     }
+    return __dirname;
+}
+
+function getPublicRoot() {
+    return path.join(getApplicationRoot(), 'app');
+}
+
+function getResourcesRoot() {
+    return miphantPath;
+}
+
+function getCertificateDirectory() {
+    const directory = path.join(
+        app.getPath('userData'),
+        'server',
+        'certificate'
+    );
+    require('fs').mkdirSync(directory, { recursive: true });
+    return directory;
+}
+
+function configureElectronCertificateTrust() {
+    session.defaultSession.setCertificateVerifyProc((request, callback) => {
+        const hostname = request.hostname;
+
+        if (
+            hostname === 'localhost' ||
+            hostname === '127.0.0.1' ||
+            hostname === '::1'
+        ) {
+            callback(0);
+            return;
+        }
+
+        callback(request.errorCode);
+    });
+}
+
+async function shutdown() {
+    if (shuttingDown) return;
+
+    shuttingDown = true;
+    loggerLog('[SERVER] Encerrando...');
+
+    await stopHttps();
+    await stopPhp();
+
+    loggerLog('[SERVER] Finalizado.');
 }
 
 // Inicia o MiPhantServer
-function startMiPhantServer(win) {
+async function startMiPhantServer(win) {
     let sMiPhantServer;
-    let sFilePHPINI = path.join(miphantPath, '/php/php.ini');
 
-    if (sPlatform == 'linux') {
-        sMiPhantServer = path.join(miphantPath, '/php/php');
-        perm(sMiPhantServer);
-    } else if (sPlatform == 'win32') {
-        sMiPhantServer = path.join(miphantPath, '/php/php.exe');
-    } else {
+    try {
+        // 0. Environment — DEVE estar antes de startPhp() para que
+        //    getPhpEnvironment() leia as variáveis de process.env
+        process.env.MIPHANT_ARGV = sArgv;
+        process.env.MIPHANT_USERNAME = sOS.userInfo().username;
+        process.env.MIPHANT_HOMEDIR = sOS.userInfo().homedir;
+        process.env.MIPHANT_PLATFORM = sPlatform;
+        // MIPHANT_LANG já foi definida em milang.js (antes de main.js executar)
+
+        // Debug mode
+        setDebugEnabled(config.dev.tools);
+
+        // 1. Certificado
+        const certDir = getCertificateDirectory();
+        const certificate = createSelfSignedCertificate(certDir);
+
+        // 2. Trust do certificado no Electron
+        configureElectronCertificateTrust();
+
+        // 3. Public root
+        setPublicRoot(getPublicRoot());
+
+        // 4. PHP
+        await startPhp(getResourcesRoot(), app.getPath('userData'));
+
+        // 5. Servidor HTTPS
+        await startHttpsServer(certificate);
+
+        // 6. Janela
+        sServerName = `https://localhost:${getHttpsPort()}/`;
+
+        loggerLog('[ELECTRON]', sServerName);
+
+        win.loadURL(sServerName);
+    } catch (error) {
+        console.error('[SERVER] Erro fatal:', error);
+        await shutdown();
         app.quit();
     }
-
-    // Environment
-    process.env.MIPHANT_ARGV = sArgv;
-    process.env.MIPHANT_USERNAME = sOS.userInfo().username;
-    process.env.MIPHANT_HOMEDIR = sOS.userInfo().homedir;
-    process.env.MIPHANT_PLATFORM = sPlatform;
-
-    // Servidor
-    let sCreateServer = sHttp.createServer();
-    let sListen = sCreateServer.listen();
-    sPort = sListen.address().port;
-    sListen.close();
-    sCreateServer.close();
-
-    if (config.server.router) {
-        miphantserverProcess = spawn(sMiPhantServer, ['-S', '127.0.0.1:' + sPort, '-c', sFilePHPINI, '-t', path.join(miphantPath, '/app/'), path.join(miphantPath, '/app/router.php')], { cwd: process.env.HOME, env: process.env });
-    } else {
-        miphantserverProcess = spawn(sMiPhantServer, ['-S', '127.0.0.1:' + sPort, '-c', sFilePHPINI, '-t', path.join(miphantPath, '/app/')], { cwd: process.env.HOME, env: process.env });
-    }
-
-    miphantserverProcess.stdout.resume();
-    miphantserverProcess.stderr.resume();
-
-    miphantserverProcess.on('error', (err) => {
-        console.error(milang.traduzir('Error starting the server:'), err);
-    });
-
-    miphantserverProcess.on('close', (code) => {
-        console.log(milang.traduzir('The server was terminated with the code:'), code);
-    });
-
-    if (sPlatform == 'linux') {
-        const checkPortL = setInterval(() => {
-            let lsof = spawn('lsof', ['-ti:' + sPort]);
-
-            lsof.stdout.on('data', (data) => {
-                console.log(milang.traduzir('Server has been started successfully.'));
-                sServerName = `http://127.0.0.1:${sPort}/`;
-                win.loadURL(sServerName);
-                clearInterval(checkPortL);
-            });
-
-            lsof.stderr.on('data', (data) => {
-                console.error(milang.traduzir('Error when running lsof:'), data);
-            });
-
-            lsof.on('close', (code) => {
-                if (code !== 0) {
-                    console.error(milang.traduzir('lsof exited with error code'), code);
-                }
-            });
-        }, 1000);
-    } else if (sPlatform == 'win32') {
-        const checkPortW = setInterval(() => {
-            let netstat = spawn('netstat', ['-ano']);
-            let findstr = spawn('findstr', [':' + sPort]);
-
-            netstat.stdout.on('data', (data) => {
-                findstr.stdin.write(data);
-            });
-
-            netstat.stderr.on('data', (data) => {
-                console.error(milang.traduzir('Error running netstat:'), data);
-            });
-
-            netstat.on('close', (code) => {
-                if (code !== 0) {
-                    console.error(milang.traduzir('netstat exited with error code'), code);
-                }
-                findstr.stdin.end();
-            });
-
-            findstr.stdout.on('data', (data) => {
-                console.log(milang.traduzir('PHP server started successfully.'));
-                sServerName = `http://127.0.0.1:${sPort}/`;
-                win.loadURL(sServerName);
-                clearInterval(checkPortW);
-            });
-        }, 1000);
-    }
-
-    miphantserverProcess.unref(); // Permite que o aplicativo seja fechado sem fechar o processo do servidor
 }
 
 // Nova Janela
-function miphantNewWindow(url, width, height, resizable, frame, hide) {
+async function miphantNewWindow(url, width, height, resizable, frame, hide, menu) {
     let sWidth = (width) ? width : config.app.width;
     let sHeight = (height) ? height : config.app.height;
     let sResizable = (resizable == true || resizable == false) ? resizable : config.app.resizable;
     let sFrame = (frame == true || frame == false) ? frame : config.app.frame;
-    let sHide = (hide == true || hide == false) ? hide : false;
+    let sHide = (hide == true || hide == false) ? hide : config.app.hide;
 
     const sNewWindow = new BrowserWindow({
         width: sWidth,
@@ -212,11 +209,7 @@ function miphantNewWindow(url, width, height, resizable, frame, hide) {
     sNewWindow.setMenu(null);
 
     if (sStartApp) {
-        startMiPhantServer(sNewWindow);
-
-        app.on("browser-window-created", (e, sNewWindow) => {
-            sNewWindow.removeMenu();
-        });
+        await startMiPhantServer(sNewWindow);
 
         const mifunctions = require(path.join(app.getAppPath(), '/mifunctions.js'));
         mifunctions.mifunctions(sNewWindow, milang, miphantNewWindow);
@@ -225,15 +218,19 @@ function miphantNewWindow(url, width, height, resizable, frame, hide) {
             app.quit();
         });
 
-        createMenu(sNewWindow, 'menu');
+        createMenu(sNewWindow, menu || 'menu');
 
         sStartApp = false;
-    } else {
-        sNewWindow.loadURL(`${sServerName}/${url.replace(sServerName, '')}`);
     }
 
-    if (url.replace(sServerName, '') && fs.existsSync(path.join(miphantPath, '/app/menus/', url.replace(sServerName, '').replace('.php', '.json')))) {
-        createMenu(sNewWindow, url.replace(sServerName, '').replace('.php', ''));
+    const cleanUrl = url.replace(sServerName, '');
+    if (cleanUrl) {
+        sNewWindow.loadURL(`${sServerName}${cleanUrl}`);
+
+        const menuFile = cleanUrl.replace('.php', '.json');
+        if (fs.existsSync(path.join(miphantPath, '/app/menus/', menuFile))) {
+            createMenu(sNewWindow, cleanUrl.replace('.php', ''));
+        }
     }
 
     if (config.dev.tools) {
@@ -244,7 +241,13 @@ function miphantNewWindow(url, width, height, resizable, frame, hide) {
 
     sNewWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (url !== '') {
-            miphantNewWindow(`${url}`);
+            // URL interna (localhost) — abre nova janela preservando sessão
+            if (url.startsWith('https://localhost') || url.startsWith('http://localhost')) {
+                miphantNewWindow(url);
+            } else {
+                // URL externa — abre no navegador do sistema
+                require('electron').shell.openExternal(url);
+            }
 
             return { action: 'deny' }
         }
@@ -311,7 +314,7 @@ function getMenuTemplate(win, menuData) {
                         // Verifica se é uma página ou URL
                         if (menuData[sKey][sSubMenuKey].page) {
                             if (menuData[sKey][sSubMenuKey].newwindow) {
-                                miphantNewWindow(menuData[sKey][sSubMenuKey].page, menuData[sKey][sSubMenuKey].width, menuData[sKey][sSubMenuKey].height, menuData[sKey][sSubMenuKey].resizable, menuData[sKey][sSubMenuKey].frame, menuData[sKey][sSubMenuKey].menu, menuData[sKey][sSubMenuKey].hide)
+                                miphantNewWindow(menuData[sKey][sSubMenuKey].page, menuData[sKey][sSubMenuKey].width, menuData[sKey][sSubMenuKey].height, menuData[sKey][sSubMenuKey].resizable, menuData[sKey][sSubMenuKey].frame, menuData[sKey][sSubMenuKey].hide, menuData[sKey][sSubMenuKey].menu)
                             } else {
                                 win.loadURL(sServerName + menuData[sKey][sSubMenuKey].page);
                             }
@@ -367,38 +370,6 @@ function createMenuContext(win) {
     });
 }
 
-// Função para encerrar o processo com base na porta
-function killProcessByPort(port) {
-    let miphantserverClose;
-    if (sPlatform == 'linux') {
-        miphantserverClose = spawn('lsof', ['-ti:' + port, '|', 'xargs', 'kill'], { shell: true });
-
-        miphantserverClose.stderr.on('data', (data) => {
-            console.log(milang.traduzir('Error terminating process on port:'), sPort);
-            return;
-        });
-
-        miphantserverClose.on('error', (err) => {
-            console.error(milang.traduzir('Error terminating process on port:'), port, err.message);
-            return;
-        });
-
-        miphantserverClose.on('close', (code) => {
-            console.log(milang.traduzir('The server was terminated with the code:'), code);
-            return;
-        });
-
-        console.log(milang.traduzir('Process at the port'), port, milang.traduzir('completed successfully.'));
-    }
-}
-
-function stopMiPhantServer() {
-    if (miphantserverProcess) {
-        killProcessByPort(sPort); // Encerra todos os processos do servidor que estão sob a mesma porta
-        console.log(milang.traduzir('Server stopped.'));
-    }
-}
-
 app.whenReady().then(() => {
     createWindow()
 
@@ -412,11 +383,41 @@ app.whenReady().then(() => {
 // Se for MACOS não roda esse comando
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
-        stopMiPhantServer();
         app.quit();
     }
 });
 
-app.on('before-quit', () => {
-    stopMiPhantServer();
+app.on('before-quit', event => {
+    if (shuttingDown) return;
+
+    event.preventDefault();
+
+    // Timeout de segurança: se o shutdown travar, força saída após 10s
+    const forceQuitTimeout = setTimeout(() => {
+        console.warn('[SERVER] Timeout no shutdown, forçando saída.');
+        app.exit(1);
+    }, 10000);
+
+    shutdown().then(() => {
+        clearTimeout(forceQuitTimeout);
+        app.exit(0);
+    });
+});
+
+
+process.on('SIGINT', () => {
+    shutdown().then(() => app.quit());
+});
+
+process.on('SIGTERM', () => {
+    shutdown().then(() => app.quit());
+});
+
+
+process.on('uncaughtException', error => {
+    console.error('[UNCAUGHT EXCEPTION]', error);
+});
+
+process.on('unhandledRejection', error => {
+    console.error('[UNHANDLED REJECTION]', error);
 });

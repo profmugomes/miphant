@@ -1,7 +1,9 @@
 // Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>
 // SPDX-License-Identifier: MIT
 
-const { ipcMain, dialog, BrowserWindow } = require('electron')
+const { ipcMain, dialog, BrowserWindow, shell, Notification, Tray, Menu, nativeImage } = require('electron');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
     mifunctions: function (win, milang, miphantNewWindow) {
@@ -14,7 +16,7 @@ module.exports = {
         });
 
         // Função para abrir arquivo
-        ipcMain.handle('appAbrirArquivo', async (event, multi) => {
+        ipcMain.handle('appAbrirArquivo', async (_, multi) => {
             let sProperties = [
                 'openFile',
                 (multi) ? 'multiSelections' : ''
@@ -38,12 +40,12 @@ module.exports = {
         });
 
         // Abrir aplicativo externo
-        ipcMain.handle('appExterno', async (event, url) => {
-            require('electron').shell.openExternal(url);
+        ipcMain.handle('appExterno', async (_, url) => {
+            shell.openExternal(url);
         });
 
         // Obter versão do aplicativo e recursos
-        ipcMain.handle('appVersao', async (event, tipo) => {
+        ipcMain.handle('appVersao', async (_, tipo) => {
             if (tipo == 'miphant') {
                 return require('electron').app.getVersion();
             } else if (tipo == 'electron') {
@@ -52,13 +54,13 @@ module.exports = {
                 return process.versions.node;
             } else if (tipo == 'chromium') {
                 return process.versions.chrome;
-            } else {
-                return '';
             }
+
+            return '';
         });
 
         // Função para caixa de alerta
-        ipcMain.handle('appMessage', async (event, title, msg, type, button) => {
+        ipcMain.handle('appMessage', async (_, title, msg, type, button) => {
             let sButtons = [button];
 
             let options = {
@@ -73,7 +75,7 @@ module.exports = {
         });
 
         // Função para caixa de confirmação
-        ipcMain.handle('appConfirm', async (event, title, msg, type, ...buttons) => {
+        ipcMain.handle('appConfirm', async (_, title, msg, type, ...buttons) => {
             let sButtons = [...buttons];
 
             let options = {
@@ -88,29 +90,35 @@ module.exports = {
         });
 
         // Abre uma nova janela personalizada
-        ipcMain.handle('appNewWindow', async (event, url, width, height, resizable, frame, menu, hide) => {
-            miphantNewWindow(url, width, height, resizable, frame, menu, hide);
+        ipcMain.handle('appNewWindow', async (_, url, width, height, resizable, frame, hide, menu) => {
+            miphantNewWindow(url, width, height, resizable, frame, hide, menu);
         });
 
         // Traduzir
-        ipcMain.handle('appTraduzir', async (event, text, ...values) => {
+        ipcMain.handle('appTraduzir', async (_, text, ...values) => {
             return milang.traduzir(text, ...values);
         });
 
         // DevTools
-        ipcMain.handle('appDevTools', async (event) => {
-            BrowserWindow.getFocusedWindow().webContents.appDevTools();
+        ipcMain.handle('appDevTools', async (_) => {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+                focusedWindow.webContents.openDevTools();
+            }
         });
 
         // Notification
-        ipcMain.handle('appNotification', async (event, title, text) => {
-            let { Notification } = require('electron');
+        ipcMain.handle('appNotification', async (_, title, text) => {
             new Notification({ title: title, body: text }).show();
         });
 
+        // Check File Exists
+        ipcMain.handle('appFileExists', async (_, filename) => {
+            return fs.existsSync(filename);
+        });
+
         // Tray
-        ipcMain.handle('appTray', async (event, title, tooltip, image, menus) => {
-            const { Tray, Menu, nativeImage } = require('electron');
+        ipcMain.handle('appTray', async (_, title, tooltip, image, menus) => {
             const icon = nativeImage.createFromPath(image);
             let tray = new Tray(icon);
 
@@ -123,14 +131,22 @@ module.exports = {
                     label: milang.traduzir(key),
                     type: menuData[key].type,
                     click: () => {
+                        // Encontra uma janela válida (não destruída)
+                        const allWindows = BrowserWindow.getAllWindows();
+                        const targetWindow = allWindows.find(w => !w.isDestroyed()) || win;
+
+                        if (!targetWindow || targetWindow.isDestroyed()) {
+                            return;
+                        }
+
                         if (menuData[key].page) {
                             if (menuData[key].newwindow) {
-                                win.webContents.executeJavaScript(`window.open('${menuData[key].page}');`);
+                                miphantNewWindow(menuData[key].page);
                             } else {
-                                win.webContents.executeJavaScript(`window.location.assign('${menuData[key].page}');`);
+                                targetWindow.webContents.executeJavaScript(`window.location.assign('${menuData[key].page}');`);
                             }
-                        } else {
-                            win.webContents.executeJavaScript(menuData[key].script);
+                        } else if (menuData[key].script) {
+                            targetWindow.webContents.executeJavaScript(menuData[key].script);
                         }
                     }
                 });
@@ -143,10 +159,7 @@ module.exports = {
         });
 
         // ExportPDF
-        ipcMain.handle('appExportPDF', async (event, filename, options) => {
-            const fs = require('fs');
-            const pdfPath = filename;
-
+        ipcMain.handle('appExportPDF', async (_, filename, options) => {
             let pdfOptions = options;
             if (!pdfOptions) {
                 pdfOptions = {
@@ -155,12 +168,17 @@ module.exports = {
             }
 
             BrowserWindow.getFocusedWindow().webContents.printToPDF(pdfOptions).then(data => {
-                fs.writeFile(pdfPath, data, (error) => {
+                const dirPath = path.dirname(filename);
+                if (!fs.existsSync(dirPath)) {
+                    fs.mkdirSync(dirPath);
+                }
+
+                fs.writeFile(filename, data, (error) => {
                     if (error) throw error
-                    console.log(milang.traduzir('PDF successfully saved to %s', pdfPath))
+                    console.log(milang.traduzir('PDF successfully saved to %s', filename))
                 })
             }).catch(error => {
-                console.log(milang.traduzir('Error when trying to generate the PDF in %s', pdfPath), error)
+                console.log(milang.traduzir('Error when trying to generate the PDF in %s', filename), error)
             })
         });
     }
