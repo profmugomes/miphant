@@ -1,10 +1,20 @@
 # MiPhant
 
-MiPhant is a desktop application runner that allows you to create and run applications using HTML, CSS, JavaScript and PHP.
+**Version 5.0.0** — Desktop PHP applications with Electron.
 
-Built with Node.js, Electron and Chromium. PHP scripts are executed through a built-in HTTPS server that communicates with PHP via the FastCGI protocol. On Linux, PHP-FPM is used as a persistent process manager. On Windows, PHP-CGI is used in FastCGI mode. Each application runs on its own random port, allowing multiple applications to run simultaneously without conflicts.
+MiPhant is a desktop application runner that lets you build and run PHP applications as native desktop apps on **Linux** and **Windows**. It combines Electron with a built-in HTTPS server that executes PHP through the FastCGI protocol, using platform-native PHP runtimes.
 
-We use a static version of PHP, compiled with [static-php-cli](https://github.com/crazywhalecc/static-php-cli).
+## Features
+
+- **Cross-platform**: Linux (PHP-FPM) and Windows (PHP-CGI)
+- **Built-in HTTPS server** with auto-generated self-signed certificates
+- **FastCGI protocol** for PHP execution with persistent process management
+- **MiPhantLibs**: PHP library for config, i18n, file operations, dialogs, routing and more
+- **Dark design system** with CSS variables and responsive components
+- **System tray**, notifications, dialogs, multi-window support
+- **i18n** with automatic language detection and fallback chain
+- **Static PHP binary** compiled via [static-php-cli](https://github.com/crazywhalecc/static-php-cli)
+- **17+ demo pages** showcasing all features
 
 ## Architecture
 
@@ -37,9 +47,20 @@ We use a static version of PHP, compiled with [static-php-cli](https://github.co
   - **Linux**: `php-fpm` — persistent process manager with dynamic worker pool
   - **Windows**: `php-cgi.exe` — CGI binary in FastCGI mode
 
-## PHP Execution
+## Server Modules
 
-MiPhant uses a static PHP binary compiled with [static-php-cli](https://github.com/crazywhalecc/static-php-cli). The PHP process communicates with the Node.js HTTPS server via the FastCGI protocol.
+The `server/` directory contains modular Node.js server components:
+
+| Module | Description |
+|---|---|
+| `http-server.js` | HTTPS server with TLS, static file serving, FastCGI routing |
+| `php-manager.js` | PHP process lifecycle: start, stop, FPM pool config (Linux), CGI binding (Windows) |
+| `fastcgi.js` | FastCGI protocol implementation for PHP communication |
+| `certificates.js` | Auto-generation of self-signed TLS certificates |
+| `logger.js` | Centralized logger with verbose mode controlled by `config.dev.tools` |
+| `utils.js` | Utility functions: free port finder, MIME types, port wait |
+
+## PHP Execution
 
 ### Linux (PHP-FPM)
 
@@ -61,9 +82,65 @@ MiPhant uses a static PHP binary compiled with [static-php-cli](https://github.c
 
 Both platforms use the same FastCGI protocol for communication. The Node.js server sends CGI parameters (request method, headers, query string, script filename, etc.) to the PHP process, which returns HTTP headers and body. The HTTPS server parses the PHP response and forwards it to the Electron renderer.
 
+## MiPhantLibs
+
+PHP library included in `app/libs/` for building desktop applications. No Composer required — files are loaded directly via `require_once`.
+
+### Namespace `MiPhantLibs\app`
+
+| Class | Description |
+|---|---|
+| `config` | Read values from `app/config.json` with nested key access |
+| `functions` | PHP helpers that generate JavaScript calls (alerts, confirm, newWindow, tray, etc.) |
+| `about` | About page generator with license display |
+| `file` | File operations: exists, open, save, create, remove |
+| `path` | Cross-platform path builder using OS separator |
+| `router` | URL router for multi-page PHP applications |
+
+### Namespace `MiPhantLibs\langs`
+
+| Class | Description |
+|---|---|
+| `translate` | i18n translation with automatic fallback chain (`pt-br` → `pt.json` → `en.json`) |
+
+### Namespace `MiPhantLibs\system`
+
+| Class | Description |
+|---|---|
+| `env` | Access MiPhant environment variables (`MIPHANT_LANG`, `MIPHANT_USERNAME`, etc.) |
+| `server` | Server helpers: domain, URI, document root |
+| `platform` | OS detection: `osLinux()`, `osWindows()` |
+
+### Usage Example
+
+```php
+require_once __DIR__ . '/libs/app/config.php';
+require_once __DIR__ . '/libs/app/functions.php';
+require_once __DIR__ . '/libs/langs/translate.php';
+require_once __DIR__ . '/libs/system/server.php';
+require_once __DIR__ . '/libs/system/env.php';
+
+use MiPhantLibs\app\config;
+use MiPhantLibs\app\functions;
+use MiPhantLibs\langs\translate;
+
+$cfg = new config();
+$func = new functions();
+$translate = new translate();
+
+// Read config
+$width = $cfg->get('app', 'width');
+
+// Show translated alert
+$func->alert('Info', $translate->get('Server has been started successfully.'), 'info');
+
+// Open new window
+$func->noTag()->newWindow('page.php', 800, 600);
+```
+
 ## MiPhant API
 
-The `miphant` object is available in the renderer process (via preload.js) and provides the following methods:
+The `miphant` object is available in the renderer process (via `preload.js`) and provides the following methods:
 
 ### Application
 
@@ -111,7 +188,7 @@ Accessed via `$_ENV` in PHP:
 
 | Variable | Description |
 |---|---|
-| `$_ENV['MIPHANT_LANG']` | System language (e.g. `'pt'`, `'en'`) |
+| `$_ENV['MIPHANT_LANG']` | System language (e.g. `'pt-br'`, `'en'`) |
 | `$_ENV['MIPHANT_USERNAME']` | Current system username |
 | `$_ENV['MIPHANT_HOMEDIR']` | User home directory |
 | `$_ENV['MIPHANT_PLATFORM']` | Platform: `'linux'` or `'win32'` |
@@ -124,14 +201,24 @@ The application is configured via `app/config.json`:
 ```json
 {
   "app": {
+    "id": "miphant",
     "name": "MiPhant",
+    "version": "5.0.0",
     "width": 800,
     "height": 600,
     "resizable": true,
     "frame": true,
     "hide": false,
     "icon": "miphant.png",
-    "disableAccelerationHardware": true
+    "disableAccelerationHardware": true,
+    "author": {
+      "name": "Murilo Gomes",
+      "email": "profmugomes@gmail.com",
+      "url": "https://www.profmugomes.com.br"
+    },
+    "homepage": "https://github.com/profmugomes/miphant/",
+    "license": "MIT",
+    "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
   },
   "server": {
     "perm": false,
@@ -147,13 +234,19 @@ The application is configured via `app/config.json`:
 ### Options
 
 **app**
+- `id`: Application identifier
 - `name`: Application name
+- `version`: Application version
 - `width` / `height`: Default window dimensions
 - `resizable`: Allow window resizing
 - `frame`: Show window frame (title bar)
 - `hide`: Start with window hidden
 - `icon`: Icon filename (placed in `app/icon/`)
 - `disableAccelerationHardware`: Disable GPU hardware acceleration
+- `author`: Author info (name, email, url)
+- `homepage`: Project homepage URL
+- `license`: License type
+- `copyright`: Copyright notice
 
 **server**
 - `perm`: Auto-apply execute permission to PHP binary (Linux)
@@ -162,6 +255,34 @@ The application is configured via `app/config.json`:
 **dev**
 - `menu`: Show the Dev menu (Build, Refresh, Tools)
 - `tools`: Auto-open DevTools on window creation
+
+## Design System
+
+MiPhant includes a dark theme design system in `app/style.css` with:
+
+- CSS custom properties for colors, spacing, and typography
+- Card, button, table, badge, and form components
+- Responsive grid layout
+- Consistent visual language across all demo pages
+
+To use in your pages:
+
+```html
+<link rel="stylesheet" href="style.css">
+```
+
+### Available classes
+
+| Class | Description |
+|---|---|
+| `.card` | Content container with dark background |
+| `.btn` | Button base class |
+| `.btn-primary` | Primary action button |
+| `.btn-outline` | Outlined button |
+| `.badge` | Small label |
+| `.badge-info` | Info-colored badge |
+| `.text-muted` | Muted text color |
+| `.collapsible` | Collapsible button (for license sections) |
 
 ## Menus
 
@@ -202,16 +323,55 @@ Menus are defined as JSON files in `app/menus/`. The main menu is `menu.json`. E
 
 ## Languages
 
-MiPhant supports multiple languages. Create a JSON file in `app/langs/` with the language code as filename (e.g., `pt.json`, `en.json`). The system language is detected automatically and the corresponding translation file is loaded. If no matching file is found, `en.json` is used as fallback.
+MiPhant supports multiple languages with automatic fallback chain. Create JSON files in `app/langs/` with the language code as filename.
+
+### Fallback chain
+
+When a language is detected (e.g. `pt-br`), the system tries:
+
+1. `pt-br.json` — exact match
+2. `pt.json` — base language
+3. `en.json` — English fallback
 
 ### Translation file format
 
 ```json
 {
-  "Hello World": "Olá Mundo",
-  "Unable to find file %s": "Não foi possível encontrar o arquivo %s"
+  "Continue": "Continuar",
+  "Cancel": "Cancelar",
+  "Unable to find file %s": "Não foi possível encontrar o arquivo %s",
+  "Server has been started successfully.": "O servidor foi iniciado com sucesso."
 }
 ```
+
+## Demo Pages
+
+MiPhant includes 17+ demo pages showcasing all features:
+
+| Page | Description |
+|---|---|
+| `index.php` | Home page with navigation to all demos |
+| `about.php` | System information and license |
+| `env.php` | Environment variables display |
+| `args.php` | Command-line arguments |
+| `message.php` | Alert and confirm dialogs |
+| `notification.php` | System notifications |
+| `openfile.php` | Open file dialog |
+| `openfiles.php` | Multiple file selection |
+| `savefile.php` | Save file dialog |
+| `selectdirectory.php` | Directory selection |
+| `cookies.php` | Cookie management |
+| `session.php` | Session management |
+| `sqlite.php` | SQLite database operations |
+| `formget.php` | GET form handling |
+| `formpost.php` | POST form handling |
+| `translate.php` | i18n translation demo |
+| `timezone.php` | Timezone configuration |
+| `pdf.php` | PDF export |
+| `extramenu.php` | Custom menus per window |
+| `phpinfo.php` | PHP configuration info |
+| `libs.php` | MiPhantLibs API documentation |
+| `preload-doc.php` | Preload API documentation |
 
 ## Project Structure
 
@@ -221,18 +381,25 @@ miphant/
 ├── preload.js              # Preload bridge (miphant API)
 ├── mifunctions.js          # IPC handlers (dialogs, tray, PDF, etc.)
 ├── milang.js               # Language detection and translation
-├── app/                    # PHP application files
-│   ├── config.json         # Application configuration
-│   ├── index.php           # Default start page
-│   ├── langs/              # Translation files (pt.json, en.json)
-│   ├── menus/              # Menu definitions (menu.json)
-│   └── *.php               # Example pages
 ├── server/                 # Node.js server modules
 │   ├── http-server.js      # HTTPS server with FastCGI routing
 │   ├── php-manager.js      # PHP process management (FPM/CGI)
 │   ├── fastcgi.js          # FastCGI protocol implementation
 │   ├── certificates.js     # Self-signed certificate generation
+│   ├── logger.js           # Centralized logger
 │   └── utils.js            # Utility functions
+├── app/                    # PHP application files
+│   ├── config.json         # Application configuration
+│   ├── style.css           # Dark theme design system
+│   ├── index.php           # Default start page
+│   ├── langs/              # Translation files (pt.json, en.json)
+│   ├── menus/              # Menu definitions (menu.json)
+│   ├── libs/               # MiPhantLibs PHP library
+│   │   ├── app/            # App classes (config, functions, file, path, about, router)
+│   │   ├── langs/          # Translation class
+│   │   ├── system/         # System classes (env, server, platform)
+│   │   └── security/       # Security utilities
+│   └── *.php               # Demo pages
 ├── php/                    # PHP binaries and configuration
 │   ├── php.ini             # PHP configuration file
 │   ├── php-fpm             # PHP-FPM binary (Linux)
@@ -262,6 +429,12 @@ npm install
 npm start
 ```
 
+### Configure Chrome sandbox (Linux)
+
+```bash
+./config-dev.sh
+```
+
 ### Build for Linux
 
 ```bash
@@ -280,7 +453,7 @@ npm run dist-win
 ./compile.sh
 ```
 
-## System Requirement
+## System Requirements
 
 - Architecture: x64
 
