@@ -134,8 +134,8 @@ icon/miphant.ico
 icon/miphant.png
 
 # server
-php/php
-php/php.exe
+php/php-fpm
+php/php-cgi.exe
 php/LICENSE
 
 # packages
@@ -144,6 +144,14 @@ packages/
 # package-lock.json
 package-lock.json
 
-#translate
-/translate.php
-functions.php.old
+# dados
+dados/
+
+# pdf
+pdf/
+
+# agent
+AGENTS.md
+
+# PHP libs (installed separately)
+app/libs/
