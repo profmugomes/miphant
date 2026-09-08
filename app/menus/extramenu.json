@@ -1,9 +1,24 @@
 {
-    "Menu":
-    {
+    "Demo Menu": {
+        "Home": {
+            "page": "index.php",
+            "key": "Ctrl+H"
+        },
+        "Open File": {
+            "page": "openfile.php",
+            "key": "Ctrl+O"
+        },
+        "separator1": {},
+        "New Window": {
+            "page": "extramenu.php",
+            "newwindow": true
+        },
+        "GitHub": {
+            "url": "https://github.com/profmugomes/miphant"
+        },
+        "separator2": {},
         "Close": {
-            "script": "window.close()",
-            "key": "ALT+F4"
+            "script": "window.close();"
         }
     }
 }

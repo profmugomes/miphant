@@ -1,82 +1,81 @@
 <?php
-header("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'");
+$lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo $_ENV['MIPHANT_LANG']; ?>">
-
+<html lang="<?php echo $lang; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MiPhant - Run and develop PHP applications for desktop</title>
-    <link rel="shortcut icon" href="#">
-    <style>
-        body {
-            font-size: 18px;
-        }
-
-        li {
-            line-height: 27px;
-        }
-    </style>
+    <title>MiPhant</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <h3>Information</h3>
-    <p id="version" style="line-height: 37px;"></p>
-    <p style="margin-top: -7px;">Version of PHP: <?php echo phpversion(); ?></p>
+    <h1>MiPhant</h1>
+    <p class="text-muted mb-3">Run and develop PHP applications for desktop</p>
 
-    <h3>Examples</h3>
-    <?php
-    $files = scandir(dirname(__FILE__) . '/');
-    echo '<ul>';
-    foreach ($files as $file) {
-        if (!empty($file)) {
-            if ($file !== '.' && $file !== '..') {
-                if (file_exists(dirname(__FILE__) . '/' . $file) && $file !== 'index.php' && $file !== 'style.css' && $file !== 'router.php') {
-                    if (is_file(dirname(__FILE__) . '/' . $file)) {
-                        printf('<li><a href="%s" target="_blank" rel="noopener">%s</a></li>', $file, ucfirst(str_replace('.php', '', $file)));
-                    }
+    <div class="grid grid-4 mb-3" id="versions">
+        <div class="stat">
+            <div class="stat-value" id="v-miphant">...</div>
+            <div class="stat-label">MiPhant</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="v-electron">...</div>
+            <div class="stat-label">Electron</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="v-node">...</div>
+            <div class="stat-label">Node.js</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="v-chromium">...</div>
+            <div class="stat-label">Chromium</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Examples</h2>
+        <ul>
+            <?php
+            $files = scandir(__DIR__);
+            foreach ($files as $file) {
+                if ($file === '.' || $file === '..' || $file === 'index.php' || $file === 'style.css' || is_dir(__DIR__ . '/' . $file)) {
+                    continue;
+                }
+                if (pathinfo($file, PATHINFO_EXTENSION) === 'php' && basename($file) !== 'index.php') {
+                    $name = ucfirst(str_replace('.php', '', $file));
+                    printf('<li><a href="%s">%s</a></li>', $file, $name);
                 }
             }
-        }
-    }
-    echo '</ul>';
-    ?>
+            ?>
+        </ul>
+    </div>
+
+    <div class="card text-muted">
+        <p>PHP <?php echo phpversion(); ?> | <?php echo $_ENV['MIPHANT_PLATFORM'] ?? ''; ?> | <?php echo $_ENV['MIPHANT_USERNAME'] ?? ''; ?></p>
+    </div>
+
     <script>
-        const txtVersion = document.getElementById('version');
+        async function loadVersions() {
+            const fields = {
+                'v-miphant': 'miphant',
+                'v-electron': 'electron',
+                'v-node': 'node',
+                'v-chromium': 'chromium'
+            };
 
-        miphant.version('miphant').then((result) => {
-            txtVersion.innerHTML = `Version of MiPhant: ${result}<br>`;
-        });
-
-        miphant.version('electron').then((result) => {
-            txtVersion.innerHTML += `Version of ElectronJS: ${result}<br>`;
-        });
-
-        miphant.version('node').then((result) => {
-            txtVersion.innerHTML += `Version of NodeJS: ${result}<br>`;
-        });
-
-        miphant.version('chromium').then((result) => {
-            txtVersion.innerHTML += `Version of Chromium: ${result}<br>`;
-        });
-
-        tray();
-        async function tray() {
-            miphant.tray('MiPhant', 'MiPhant', '', JSON.stringify({
-                "Page Message": {
-                    page: "/message.php",
-                    newwindow: true
-                },
-                "Message": {
-                    script: "miphant.alert('MiPhant', 'This is an example message!', 'info', 'Continue');"
-                },
-                "Close": {
-                    script: 'miphant.close();'
-                }
-            }));
+            for (const [id, type] of Object.entries(fields)) {
+                const el = document.getElementById(id);
+                if (el) el.textContent = await miphant.version(type);
+            }
         }
+
+        loadVersions();
+
+        miphant.tray('MiPhant', 'MiPhant', '', JSON.stringify({
+            "Home": { page: "index.php" },
+            "Message": { script: "miphant.alert('MiPhant', 'Hello from tray!', 'info', 'OK');" },
+            "Close": { script: "miphant.close();" }
+        }));
     </script>
 </body>
-
 </html>

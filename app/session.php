@@ -1,34 +1,32 @@
 <?php
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'");
-
+$lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 session_name('miphant');
 session_start();
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo $_ENV['MIPHANT_LANG']; ?>">
-
+<html lang="<?php echo $lang; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Session | MiPhant</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <?php
-    if (empty($_SESSION['info'])) {
-        $count = 1;
-        $_SESSION['info'] = $count;
+    <h1>Session</h1>
+    <p class="text-muted mb-3">PHP session example</p>
 
-        echo 'Session: ' . $count;
-    } else {
-        $count = $_SESSION['info'] + 1;
-        $_SESSION['info'] = $count;
+    <div class="card">
+        <?php
+        $count = ($_SESSION['counter'] ?? 0) + 1;
+        $_SESSION['counter'] = $count;
+        ?>
+        <div class="stat mb-2">
+            <div class="stat-value"><?php echo $count; ?></div>
+            <div class="stat-label">Session Counter</div>
+        </div>
+        <button class="btn btn-primary" onclick="location.reload()">Increment</button>
+    </div>
 
-        echo 'Session: ' . $count;
-    }
-
-    echo '<p><a href="javascript:window.location.reload();">Update Page</a></p>';
-    ?>
+    <a href="index.php" class="btn btn-outline">&larr; Back</a>
 </body>
-
 </html>

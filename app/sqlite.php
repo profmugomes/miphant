@@ -1,61 +1,72 @@
 <?php
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'");
+$lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 
-if (empty($_COOKIE['info'])) {
-    $count = 1;
-    setcookie('info[msg]', $count, 0, '/', $_SERVER['SERVER_NAME'], false, true);
-} else {
-    $count = $_COOKIE['info']['msg'] + 1;
-    setcookie('info[msg]', $count, 0, '/', $_SERVER['SERVER_NAME'], false, true);
+$dbPath = __DIR__ . '/dados/example.sqlite';
+$db = new SQLite3($dbPath);
+$db->exec("CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+)");
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $msg = filter_input(INPUT_POST, 'message', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    if ($msg) {
+        $stmt = $db->prepare("INSERT INTO logs (message) VALUES (:msg)");
+        $stmt->bindValue(':msg', $msg, SQLITE3_TEXT);
+        $stmt->execute();
+        header('Location: sqlite.php');
+        exit;
+    }
 }
+
+$result = $db->query('SELECT * FROM logs ORDER BY id DESC LIMIT 20');
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo $_ENV['MIPHANT_LANG']; ?>">
-
+<html lang="<?php echo $lang; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQLITE3 | MiPhant</title>
+    <title>SQLite3 | MiPhant</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <?php
-    $pathDados = dirname(__FILE__) . '/dados/';
-    if (!file_exists($pathDados)) {
-        mkdir($pathDados);
-    }
+    <h1>SQLite3</h1>
+    <p class="text-muted mb-3">SQLite database example</p>
 
-    // Creates the database and the table
-    $db1 = new SQLite3($pathDados . '/example.sqlite');
-    $db1->exec("CREATE TABLE IF NOT EXISTS mi_example (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
-)");
-    $db1->close();
 
-    // Insert records
-    $db2 = new SQLite3($pathDados . '/example.sqlite', SQLITE3_OPEN_READWRITE);
-    if (empty($_COOKIE['info'])) {
-        $db2->query("INSERT INTO mi_example (name) VALUES ('" . $count . "')");
-    } else {
-        if ($stmt = $db2->prepare("INSERT INTO mi_example (name) VALUES (:name)")) {
-            $stmt->bindParam(':name', $count);
-            $stmt->execute();
-            $stmt->close();
-        }
-    }
-    $db2->close();
 
-    echo '<p><a href="javascript:window.location.reload();">Update Page</a></p>';
+    <div class="card">
+        <h2>Add Record</h2>
+        <form method="post">
+            <div class="form-group">
+                <label for="message">Message</label>
+                <input type="text" id="message" name="message" placeholder="Type a message..." required>
+            </div>
+            <button type="submit" class="btn btn-success">Insert</button>
+        </form>
+    </div>
 
-    // Check records
-    $db3 = new SQLite3($pathDados . '/example.sqlite', SQLITE3_OPEN_READONLY);
-    $query = $db3->query('SELECT * FROM mi_example ORDER BY id DESC');
-    while ($row = $query->fetchArray(SQLITE3_ASSOC)) {
-        echo $row['name'] . '<br>';
-    }
-    $db3->close();
-    ?>
+    <div class="card">
+        <h2>Records</h2>
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Message</th>
+                <th>Created</th>
+            </tr>
+            <?php while ($row = $result->fetchArray(SQLITE3_ASSOC)): ?>
+            <tr>
+                <td><?php echo $row['id']; ?></td>
+                <td><?php echo htmlspecialchars($row['message']); ?></td>
+                <td><?php echo $row['created_at']; ?></td>
+            </tr>
+            <?php endwhile; ?>
+        </table>
+    </div>
+
+    <?php $db->close(); ?>
+
+    <a href="index.php" class="btn btn-outline">&larr; Back</a>
 </body>
-
 </html>

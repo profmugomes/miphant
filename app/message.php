@@ -1,40 +1,61 @@
 <?php
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'");
+$lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo $_ENV['MIPHANT_LANG']; ?>">
-
+<html lang="<?php echo $lang; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Message</title>
-
+    <title>Message | MiPhant</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <button type="button" onclick="message()">Display message</button>
-    <button type="button" onclick="confirm()">Confirm message</button>
-    <div id="info"></div>
+    <h1>Message</h1>
+    <p class="text-muted mb-3">Alert and confirm dialogs</p>
+
+    <div class="card">
+        <h2>Alert</h2>
+        <p class="text-muted">Display a simple alert message</p>
+        <button class="btn btn-primary" onclick="showAlert()">Show Alert</button>
+    </div>
+
+    <div class="card">
+        <h2>Confirm</h2>
+        <p class="text-muted">Display a confirmation dialog with multiple buttons</p>
+        <button class="btn btn-primary" onclick="showConfirm()">Show Confirm</button>
+    </div>
+
+    <div class="card" id="result" class="hidden">
+        <h3>Result</h3>
+        <p id="result-text"></p>
+    </div>
+
+    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+
     <script>
-        async function message() {
-            miphant.alert('Information message', 'This is an example of a message!', 'info', 'Continue');
+        function showAlert() {
+            miphant.alert('Information', 'This is an example alert message!', 'info', 'Continue');
         }
 
-        async function confirm() {
-            miphant.confirm('Confirmation message', 'This is an example of a message!', 'error', 'Continue', 'Cancel', 'Button1', 'Button2').then((result) => {
-                if (result == 1) {
-                    document.getElementById('info').innerHTML = 'Not confirmed';
-                } else if (result == 2) {
-                    document.getElementById('info').innerHTML = 'Button 1';
-                } else if (result == 3) {
-                    document.getElementById('info').innerHTML = 'Button 2';
+        function showConfirm() {
+            miphant.confirm(
+                'Confirmation',
+                'Do you want to continue?',
+                'question',
+                'Yes',
+                'No'
+            ).then((result) => {
+                const el = document.getElementById('result');
+                const text = document.getElementById('result-text');
+                el.classList.remove('hidden');
+
+                if (result === 0) {
+                    text.innerHTML = '<span class="text-success">Confirmed (Yes)</span>';
                 } else {
-                    document.getElementById('info').innerHTML = 'Confirmed';
+                    text.innerHTML = '<span class="text-danger">Cancelled (No)</span>';
                 }
             });
         }
     </script>
 </body>
-
 </html>

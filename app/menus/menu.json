@@ -1,61 +1,96 @@
 {
-    "Examples": {
-        "Home page": {
-            "page": "index.php"
+    "Home": {
+        "Home": {
+            "page": "index.php",
+            "key": "CTRL+H"
+        }
+    },
+    "System": {
+        "Environment": {
+            "page": "env.php"
         },
-        "separator1": {},
-        "Open": {
-            "page": "openfile.php",
-            "key": "CTRL+O"
-        },
-        "Save": {
-            "page": "savefile.php",
-            "key": "CTRL+B"
-        },
-        "Message": {
-            "page": "message.php"
-        },
-        "separator2": {},
-        "Cookies": {
-            "page": "cookies.php",
-            "key": "CTRL+K",
-            "newwindow": true
-        },
-        "Include": {
-            "page": "include.php",
-            "key": "CTRL+I"
+        "Arguments": {
+            "page": "args.php"
         },
         "PHPInfo": {
             "page": "phpinfo.php",
             "key": "CTRL+P",
             "newwindow": true
         },
-        "No Cache": {
-            "page": "nocache.php",
+        "Timezone": {
+            "page": "timezone.php",
+            "key": "CTRL+T"
+        }
+    },
+    "Dialogs": {
+        "Message": {
+            "page": "message.php"
+        },
+        "Notification": {
+            "page": "notification.php"
+        }
+    },
+    "Files": {
+        "Open File": {
+            "page": "openfile.php",
+            "key": "CTRL+O"
+        },
+        "Open Files": {
+            "page": "openfiles.php"
+        },
+        "Save File": {
+            "page": "savefile.php",
             "key": "CTRL+S"
         },
-        "Session": {
-            "page": "session.php",
-            "key": "CTRL+SHIFT+S"
+        "Select Directory": {
+            "page": "selectdirectory.php"
         },
+        "Export PDF": {
+            "page": "pdf.php"
+        }
+    },
+    "Data": {
         "SQLite3": {
             "page": "sqlite.php",
             "key": "CTRL+ALT+S"
         },
-        "Timezone": {
-            "page": "timezone.php",
-            "key": "CTRL+T"
+        "Cookies": {
+            "page": "cookies.php",
+            "key": "CTRL+K"
         },
-        "separator3": {},
-        "Post Form": {
+        "Session": {
+            "page": "session.php"
+        }
+    },
+    "Forms": {
+        "POST Form": {
             "page": "formpost.php"
         },
         "GET Form": {
             "page": "formget.php"
         }
     },
-    "About":
-    {
+    "i18n": {
+        "Translate": {
+            "page": "translate.php"
+        },
+        "Extra Menu": {
+            "page": "extramenu.php",
+            "newwindow": true
+        }
+    },
+    "Docs": {
+        "PHP Libraries": {
+            "page": "libs.php"
+        },
+        "Preload API": {
+            "page": "preload-doc.php"
+        }
+    },
+    "About": {
+        "About MiPhant": {
+            "page": "about.php"
+        },
         "Support MiPhant": {
             "url": "https://github.com/profmugomes/miphant",
             "key": "F1"

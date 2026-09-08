@@ -1,25 +1,36 @@
 <?php
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'");
+$lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo $_ENV['MIPHANT_LANG']; ?>">
-
+<html lang="<?php echo $lang; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notification</title>
-
+    <title>Notification | MiPhant</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <button type="button" onclick="notification()">Notification</button>
-    <div id="info"></div>
+    <h1>Notification</h1>
+    <p class="text-muted mb-3">System notification</p>
+
+    <div class="card">
+        <h2>Send Notification</h2>
+        <p class="text-muted">Display a desktop notification</p>
+        <button class="btn btn-primary" onclick="sendNotification()">Send Notification</button>
+    </div>
+
+    <div id="result" class="card hidden">
+        <h3>Result</h3>
+        <p class="text-success">Notification sent!</p>
+    </div>
+
+    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+
     <script>
-        async function notification() {
-            miphant.notification('Information message', 'This is an example of a message!');
+        function sendNotification() {
+            miphant.notification('MiPhant', 'This is a desktop notification!');
+            document.getElementById('result').classList.remove('hidden');
         }
     </script>
 </body>
-
 </html>

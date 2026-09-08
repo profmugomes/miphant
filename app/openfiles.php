@@ -1,29 +1,42 @@
 <?php
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'");
+$lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo $_ENV['MIPHANT_LANG']; ?>">
-
+<html lang="<?php echo $lang; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Open Files</title>
-
+    <title>Open Files | MiPhant</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <div id="txtFiles"></div>
+    <h1>Open Files</h1>
+    <p class="text-muted mb-3">Open and list multiple files</p>
+
+    <div class="card">
+        <button class="btn btn-primary" onclick="openFiles()">Select Files</button>
+    </div>
+
+    <div class="card hidden" id="result">
+        <h3>Selected Files</h3>
+        <ul id="file-list"></ul>
+    </div>
+
+    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+
     <script>
-        const txtFiles = document.getElementById('txtFiles')
-        async function open() {
-            let sOpen = await miphant.openFile(true);
-            sOpen.forEach((value) => {
-                txtFiles.innerHTML += `${value}<br>`;
-            });
+        async function openFiles() {
+            const files = await miphant.openFile(true);
+            if (files && files.length > 0) {
+                const list = document.getElementById('file-list');
+                const card = document.getElementById('result');
+                list.innerHTML = '';
+                files.forEach(f => {
+                    list.innerHTML += `<li>${f}</li>`;
+                });
+                card.classList.remove('hidden');
+            }
         }
-        open();
     </script>
 </body>
-
 </html>
