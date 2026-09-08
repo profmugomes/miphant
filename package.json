@@ -1,6 +1,6 @@
 {
     "name": "miphant",
-    "version": "4.2.0",
+    "version": "5.0.0",
     "description": "MiPhant is a software that runs applications developed in PHP for desktop Linux Ubuntu and Windows.",
     "main": "main.js",
     "scripts": {

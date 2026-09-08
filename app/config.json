@@ -2,11 +2,12 @@
 	"app": {
 		"id": "miphant",
 		"name": "MiPhant",
-		"version": "4.2.0",
+		"version": "5.0.0",
 		"width": 800,
 		"height": 600,
 		"resizable": true,
 		"frame": true,
+		"hide": false,
 		"icon": "miphant.png",
 		"disableAccelerationHardware": true,
 		"author": {
@@ -19,7 +20,7 @@
 		"copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
 	},
 	"server": {
-		"perm": true,
+		"perm": false,
 		"router": false
 	},
 	"dev": {

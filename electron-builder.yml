@@ -5,6 +5,7 @@ files:
   - "!app/**/*"
   - "!php/**/*"
   - "!packages/**/*"
+  - "!config-dev.sh"
   - "!config.sh"
   - "!compile.sh"
 extraResources:
@@ -29,4 +30,6 @@ linux:
   extraResources:
    - from: "./php/php"
      to: "php/php"
+   - from: "./config.sh"
+     to: "config.sh"
 publish: null
