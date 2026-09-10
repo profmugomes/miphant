@@ -20,16 +20,16 @@ win:
   target:
     - "dir"
   extraResources:
-   - from: "./php/php.exe"
-     to: "php/php.exe"
+   - from: "./php/php-cgi.exe"
+     to: "php/php-cgi.exe"
 linux:
   artifactName: ${productName}-${version}-linux.${ext}
   icon: icon/miphant.png
   target:
     - "dir"
   extraResources:
-   - from: "./php/php"
-     to: "php/php"
+   - from: "./php/php-fpm"
+     to: "php/php-fpm"
    - from: "./config.sh"
      to: "config.sh"
 publish: null
