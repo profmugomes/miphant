@@ -85,15 +85,8 @@ let shuttingDown = false;
 // CAMINHOS
 // ============================================================
 
-function getApplicationRoot() {
-    if (app.isPackaged) {
-        return path.join(process.resourcesPath, 'app', 'public');
-    }
-    return __dirname;
-}
-
 function getPublicRoot() {
-    return path.join(getApplicationRoot(), 'app', 'public');
+    return path.join(miphantPath, 'app', 'public');
 }
 
 function getResourcesRoot() {
