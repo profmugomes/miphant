@@ -17,7 +17,7 @@
     "homepage": "https://www.profmugomes.com.br",
     "license": "MIT",
     "devDependencies": {
-        "electron": "^42.3.0",
+        "electron": "^44.3.0",
         "electron-builder": "^26.4.0"
     }
 }
