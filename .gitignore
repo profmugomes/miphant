@@ -152,6 +152,3 @@ pdf/
 
 # agent
 AGENTS.md
-
-# PHP libs (installed separately)
-app/libs/
