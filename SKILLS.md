@@ -687,25 +687,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 
 ---
 
-## 9. Testes
-
-### Executar testes
-
-```bash
-/usr/bin/php8.5 tests/test-libs.php
-```
-
-### Cobertura
-
-- 101 testes cobrindo:
-  - 21 libs PHP (app/, system/, langs/, security/)
-  - 10 arquivos JS (syntax check)
-  - Headers de licença
-  - Funcionalidades de cada classe
-
----
-
-## 10. Licença
+## 9. Licença
 
 Copyright (c) 2025-2026 Murilo Gomes. All Rights Reserved.
 
