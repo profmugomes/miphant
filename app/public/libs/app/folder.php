@@ -1,8 +1,7 @@
 <?php
-// Copyright (C) 2025-2026 Murilo Gomes Julio
-// SPDX-License-Identifier: LGPL-2.1-only
-
-// Site: https://youtube.com/@mugomesoficial
+// Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All Rights Reserved.
+// Licensed under the PolyForm Perimeter License 1.0.1.
+// See LICENSE.md for details.
 
 namespace MiPhantLibs\app;
 
@@ -23,15 +22,16 @@ class folder {
 
         foreach ($arquivos as $arquivo) {
             if ($arquivo !== '.' && $arquivo !== '..') {
-                if (is_dir($this->caminho->join($diretorio . '/' . $arquivo))) {
-                    $this->excluirRecursivamente($this->caminho->join($diretorio . '/' . $arquivo) . '/');                    
+                $completo = $diretorio . DIRECTORY_SEPARATOR . $arquivo;
+                if (is_dir($completo)) {
+                    $this->excluirRecursivamente($completo);
                 } else {
-                    unlink($this->caminho->join($diretorio . '/' . $arquivo));
+                    unlink($completo);
                 }
             }
         }
 
-        return rmdir($this->caminho->join($diretorio . '/'));
+        return rmdir($diretorio);
     }
 
     public function remove(string $directory, bool $recursive = false) {

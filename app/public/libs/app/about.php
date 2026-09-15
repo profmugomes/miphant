@@ -1,8 +1,7 @@
 <?php
-// Copyright (C) 2025-2026 Murilo Gomes Julio
-// SPDX-License-Identifier: LGPL-2.1-only
-
-// Site: https://youtube.com/@mugomesoficial
+// Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All Rights Reserved.
+// Licensed under the PolyForm Perimeter License 1.0.1.
+// See LICENSE.md for details.
 
 namespace MiPhantLibs\app;
 
@@ -49,18 +48,27 @@ class about
         $txt .= '<h3>' . $this->traduzir->get('Recursos de Terceiros Utilizados') . '</h3>';
 
         $file = new file();
-        $path = new path();
         $server = new server();
-        $miphantLicense = str_replace('/app', '', $server->documentroot());
-        $electronLicense = str_replace('/resources/app', '', $server->documentroot());
-        $phpLicense = str_replace('/app', '/php', $server->documentroot());
+        $base = dirname($server->documentroot(), 2);
+        $phpLicense = $base . '/php/LICENSE';
 
-        $txt .= $this->setLicense('MiPhant', $file->open($path->join($miphantLicense) . '/LICENSE'));
-        $txt .= $this->setLicense('MiPhantLibs', $file->open(dirname(__FILE__, 3) . '/LICENSE'));
-        $txt .= $this->setLicense('Electron', $file->open($path->join($electronLicense) . '/LICENSE'));
+        $txt .= $this->setLicense('MiPhant', $file->open($base . '/LICENSE.md'));
+        $txt .= $this->setLicense('MiPhantLibs', $file->open($base . '/LICENSE.md'));
 
-        if (file_exists($path->join($phpLicense) . '/LICENSE')) {
-            $txt .= $this->setLicense('PHP', $file->open($path->join($phpLicense) . '/LICENSE'));
+        $electronCandidates = [
+            dirname($base) . '/LICENSE.electron.txt',
+            dirname($base) . '/LICENSE',
+            $base . '/LICENSE.electron.txt',
+        ];
+        foreach ($electronCandidates as $el) {
+            if (file_exists($el)) {
+                $txt .= $this->setLicense('Electron', $file->open($el));
+                break;
+            }
+        }
+
+        if (file_exists($phpLicense)) {
+            $txt .= $this->setLicense('PHP', $file->open($phpLicense));
         }
 
         $txt .= $text;
