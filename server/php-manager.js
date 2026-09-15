@@ -1,5 +1,6 @@
-// Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>
-// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All Rights Reserved.
+// Licensed under the PolyForm Perimeter License 1.0.1.
+// See LICENSE.md for details.
 
 'use strict';
 
@@ -11,19 +12,14 @@ const { spawn } = require('child_process');
 
 const { exists, findFreePort, waitForPort } = require('./utils');
 const { log: loggerLog } = require('./logger');
-
-// ============================================================
-// CONFIGURACAO
-// ============================================================
-
-const FCGI_HOST = '127.0.0.1';
+const { HOST } = require('./config');
 
 // ============================================================
 // ESTADO
 // ============================================================
 
 let phpProcess = null;
-let phpFcgiPort = 0;
+let phpPort = 0;
 
 // ============================================================
 // CAMINHOS
@@ -124,7 +120,7 @@ error_log = ${logFile}
 daemonize = no
 
 [www]
-listen = ${FCGI_HOST}:${port}
+listen = ${HOST}:${port}
 listen.backlog = 128
 pm = dynamic
 pm.max_children = ${maxChildren}
@@ -157,20 +153,20 @@ async function startPhp(resourcesPath, userDataPath) {
         throw new Error(`PHP nao encontrado:\n${phpExecutable}`);
     }
 
-    phpFcgiPort = await findFreePort(FCGI_HOST);
-    loggerLog(`[PHP] FastCGI port: ${phpFcgiPort}`);
+    phpPort = await findFreePort(HOST);
+    loggerLog(`[PHP] Port: ${phpPort}`);
 
     const environment = getPhpEnvironment(resourcesPath);
 
     let args;
 
     if (process.platform === 'win32') {
-        args = ['-b', `${FCGI_HOST}:${phpFcgiPort}`];
+        args = ['-b', `${HOST}:${phpPort}`];
     } else {
         const config = await createPhpFpmConfig(
             resourcesPath,
             userDataPath,
-            phpFcgiPort
+            phpPort
         );
         args = ['-y', config, '-F'];
     }
@@ -208,10 +204,10 @@ async function startPhp(resourcesPath, userDataPath) {
         phpProcess = null;
     });
 
-    await waitForPort(FCGI_HOST, phpFcgiPort, 10000);
-    loggerLog('[PHP] FastCGI disponivel.');
+    await waitForPort(HOST, phpPort, 10000);
+    loggerLog('[PHP] Disponivel.');
 
-    return phpFcgiPort;
+    return phpPort;
 }
 
 // ============================================================
@@ -268,8 +264,8 @@ function getPhpProcess() {
     return phpProcess;
 }
 
-function getFcgiPort() {
-    return phpFcgiPort;
+function getPhpPort() {
+    return phpPort;
 }
 
 // ============================================================
@@ -280,6 +276,6 @@ module.exports = {
     startPhp,
     stopPhp,
     getPhpProcess,
-    getFcgiPort,
+    getPhpPort,
     getPhpDirectory
 };

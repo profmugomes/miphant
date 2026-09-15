@@ -1,27 +1,27 @@
-// Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>
-// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All Rights Reserved.
+// Licensed under the PolyForm Perimeter License 1.0.1.
+// See LICENSE.md for details.
 
 'use strict';
 
 const net = require('net');
+const { PHP_TIMEOUT, PHP_MAX_RESPONSE_SIZE } = require('./config');
 
 // ============================================================
-// FASTCGI CONSTANTS
+// PHP PROTOCOL CONSTANTS
 // ============================================================
 
-const FCGI_VERSION_1 = 1;
+const PHP_PROTOCOL_VERSION_1 = 1;
 
-const FCGI_BEGIN_REQUEST = 1;
-const FCGI_END_REQUEST = 3;
-const FCGI_PARAMS = 4;
-const FCGI_STDIN = 5;
-const FCGI_STDOUT = 6;
-const FCGI_STDERR = 7;
+const PHP_PROTOCOL_BEGIN_REQUEST = 1;
+const PHP_PROTOCOL_END_REQUEST = 3;
+const PHP_PROTOCOL_PARAMS = 4;
+const PHP_PROTOCOL_STDIN = 5;
+const PHP_PROTOCOL_STDOUT = 6;
+const PHP_PROTOCOL_STDERR = 7;
 
-const FCGI_RESPONDER = 1;
-const FCGI_KEEP_CONN = 0;
-
-const FCGI_TIMEOUT = 30000;
+const PHP_PROTOCOL_RESPONDER = 1;
+const PHP_PROTOCOL_KEEP_CONN = 0;
 
 // ============================================================
 // REQUEST ID INCREMENTAL (BUG FIX)
@@ -30,14 +30,14 @@ const FCGI_TIMEOUT = 30000;
 let nextRequestId = 1;
 
 // ============================================================
-// CRIAR REGISTRO FASTCGI
+// CRIAR REGISTRO PHP PROTOCOL
 // ============================================================
 
-function createFcgiRecord(type, requestId, content = Buffer.alloc(0)) {
+function createPhpRecord(type, requestId, content = Buffer.alloc(0)) {
     const padding = (8 - (content.length % 8)) % 8;
     const header = Buffer.alloc(8);
 
-    header.writeUInt8(FCGI_VERSION_1, 0);
+    header.writeUInt8(PHP_PROTOCOL_VERSION_1, 0);
     header.writeUInt8(type, 1);
     header.writeUInt16BE(requestId, 2);
     header.writeUInt16BE(content.length, 4);
@@ -48,10 +48,10 @@ function createFcgiRecord(type, requestId, content = Buffer.alloc(0)) {
 }
 
 // ============================================================
-// CODIFICAR COMPRIMENTO FASTCGI
+// CODIFICAR COMPRIMENTO PHP PROTOCOL
 // ============================================================
 
-function encodeFcgiLength(length) {
+function encodePhpLength(length) {
     if (length < 128) {
         return Buffer.from([length]);
     }
@@ -62,18 +62,18 @@ function encodeFcgiLength(length) {
 }
 
 // ============================================================
-// CODIFICAR PARAMETROS FASTCGI
+// CODIFICAR PARAMETROS PHP PROTOCOL
 // ============================================================
 
-function encodeFcgiParams(params) {
+function encodePhpParams(params) {
     const buffers = [];
 
     for (const [name, value] of Object.entries(params)) {
         const nameBuffer = Buffer.from(String(name), 'utf8');
         const valueBuffer = Buffer.from(String(value ?? ''), 'utf8');
 
-        buffers.push(encodeFcgiLength(nameBuffer.length));
-        buffers.push(encodeFcgiLength(valueBuffer.length));
+        buffers.push(encodePhpLength(nameBuffer.length));
+        buffers.push(encodePhpLength(valueBuffer.length));
         buffers.push(nameBuffer);
         buffers.push(valueBuffer);
     }
@@ -82,18 +82,16 @@ function encodeFcgiParams(params) {
 }
 
 // ============================================================
-// EXECUTAR REQUISICAO FASTCGI
+// EXECUTAR REQUISICAO PHP PROTOCOL
 //
 // Correcoes:
 //   - requestId incremental (bug fix)
-//   - FCGI_KEEP_CONN = 0 (bug fix)
+//   - PHP_PROTOCOL_KEEP_CONN = 0 (bug fix)
 //   - timeout no socket (bug fix)
-//   - FCGI_RESPONSE_MAX_SIZE (bug fix)
+//   - PHP_MAX_RESPONSE_SIZE (bug fix)
 // ============================================================
 
-const FCGI_RESPONSE_MAX_SIZE = 50 * 1024 * 1024;
-
-function executeFastCGI({ host, port, params, body }) {
+function executePhpProtocol({ host, port, params, body }) {
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
         const requestId = nextRequestId++;
@@ -106,8 +104,8 @@ function executeFastCGI({ host, port, params, body }) {
         let totalResponseSize = 0;
 
         const timer = setTimeout(() => {
-            fail(new Error('FastCGI timeout'));
-        }, FCGI_TIMEOUT);
+            fail(new Error('PHP protocol timeout'));
+        }, PHP_TIMEOUT);
 
         function cleanup() {
             clearTimeout(timer);
@@ -152,25 +150,25 @@ function executeFastCGI({ host, port, params, body }) {
                 const content = incoming.subarray(8, 8 + contentLength);
                 incoming = Buffer.from(incoming.subarray(total));
 
-                if (version !== FCGI_VERSION_1) continue;
+                if (version !== PHP_PROTOCOL_VERSION_1) continue;
                 if (id !== requestId) continue;
 
-                if (type === FCGI_STDOUT) {
+                if (type === PHP_PROTOCOL_STDOUT) {
                     if (content.length) {
                         totalResponseSize += content.length;
 
-                        if (totalResponseSize > FCGI_RESPONSE_MAX_SIZE) {
-                            fail(new Error('FastCGI response too large'));
+                        if (totalResponseSize > PHP_MAX_RESPONSE_SIZE) {
+                            fail(new Error('PHP response too large'));
                             return;
                         }
 
                         stdoutChunks.push(Buffer.from(content));
                     }
-                } else if (type === FCGI_STDERR) {
+                } else if (type === PHP_PROTOCOL_STDERR) {
                     if (content.length) {
                         stderrChunks.push(Buffer.from(content));
                     }
-                } else if (type === FCGI_END_REQUEST) {
+                } else if (type === PHP_PROTOCOL_END_REQUEST) {
                     complete();
                     return;
                 }
@@ -187,19 +185,19 @@ function executeFastCGI({ host, port, params, body }) {
         });
 
         socket.on('timeout', () => {
-            fail(new Error('FastCGI socket timeout'));
+            fail(new Error('PHP protocol socket timeout'));
         });
 
         socket.connect(port, host, () => {
             // BEGIN_REQUEST
             const begin = Buffer.alloc(8);
-            begin.writeUInt16BE(FCGI_RESPONDER, 0);
-            begin.writeUInt8(FCGI_KEEP_CONN, 2);
+            begin.writeUInt16BE(PHP_PROTOCOL_RESPONDER, 0);
+            begin.writeUInt8(PHP_PROTOCOL_KEEP_CONN, 2);
 
-            socket.write(createFcgiRecord(FCGI_BEGIN_REQUEST, requestId, begin));
+            socket.write(createPhpRecord(PHP_PROTOCOL_BEGIN_REQUEST, requestId, begin));
 
             // PARAMS
-            const paramsBuffer = encodeFcgiParams(params);
+            const paramsBuffer = encodePhpParams(params);
             const PARAMS_MAX = 65535;
 
             for (let offset = 0; offset < paramsBuffer.length; offset += PARAMS_MAX) {
@@ -207,10 +205,10 @@ function executeFastCGI({ host, port, params, body }) {
                     offset,
                     Math.min(offset + PARAMS_MAX, paramsBuffer.length)
                 );
-                socket.write(createFcgiRecord(FCGI_PARAMS, requestId, slice));
+                socket.write(createPhpRecord(PHP_PROTOCOL_PARAMS, requestId, slice));
             }
 
-            socket.write(createFcgiRecord(FCGI_PARAMS, requestId));
+            socket.write(createPhpRecord(PHP_PROTOCOL_PARAMS, requestId));
 
             // STDIN
             if (body && body.length > 0) {
@@ -219,11 +217,11 @@ function executeFastCGI({ host, port, params, body }) {
                         offset,
                         Math.min(offset + PARAMS_MAX, body.length)
                     );
-                    socket.write(createFcgiRecord(FCGI_STDIN, requestId, slice));
+                    socket.write(createPhpRecord(PHP_PROTOCOL_STDIN, requestId, slice));
                 }
             }
 
-            socket.write(createFcgiRecord(FCGI_STDIN, requestId));
+            socket.write(createPhpRecord(PHP_PROTOCOL_STDIN, requestId));
         });
     });
 }
@@ -327,7 +325,7 @@ function sanitizeHeaders(headers) {
 // ============================================================
 
 module.exports = {
-    executeFastCGI,
+    executePhpProtocol,
     parsePhpResponse,
     sanitizeHeaders
 };

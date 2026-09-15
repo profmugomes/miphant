@@ -1,5 +1,6 @@
-// Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>
-// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All Rights Reserved.
+// Licensed under the PolyForm Perimeter License 1.0.1.
+// See LICENSE.md for details.
 
 'use strict';
 
@@ -10,17 +11,10 @@ const fsp = require('fs/promises');
 const path = require('path');
 
 const { exists, findFreePort, getMimeType } = require('./utils');
-const { executeFastCGI, parsePhpResponse, sanitizeHeaders } = require('./fastcgi');
-const { getFcgiPort } = require('./php-manager');
+const { executePhpProtocol, parsePhpResponse, sanitizeHeaders } = require('./php-protocol');
+const { getPhpPort } = require('./php-manager');
 const { log: loggerLog } = require('./logger');
-
-// ============================================================
-// CONFIGURACAO
-// ============================================================
-
-const HTTPS_HOST = '127.0.0.1';
-const DEFAULT_HTTPS_PORT = 8443;
-const MAX_BODY_SIZE = 50 * 1024 * 1024;
+const { HOST, DEFAULT_HTTPS_PORT, MAX_BODY_SIZE } = require('./config');
 
 // ============================================================
 // ESTADO
@@ -149,7 +143,7 @@ function createCgiParameters(req, filePath, serverPort, isRouted) {
         QUERY_STRING: url.searchParams.toString(),
         SERVER_NAME: host.split(':')[0],
         SERVER_PORT: String(serverPort),
-        REMOTE_ADDR: req.socket.remoteAddress || '127.0.0.1',
+        REMOTE_ADDR: req.socket.remoteAddress || HOST,
         HTTPS: 'on',
         REDIRECT_STATUS: '200'
     };
@@ -226,9 +220,9 @@ async function executePhp(req, res, filePath, serverPort, isRouted) {
         const body = await readRequestBody(req);
         const params = createCgiParameters(req, filePath, serverPort, isRouted);
 
-        const result = await executeFastCGI({
-            host: '127.0.0.1',
-            port: getFcgiPort(),
+        const result = await executePhpProtocol({
+            host: HOST,
+            port: getPhpPort(),
             params,
             body
         });
@@ -408,7 +402,7 @@ async function startHttpsServer(certificate) {
         cert: fs.readFileSync(certificate.cert)
     };
 
-    httpsPort = await findFreePort(HTTPS_HOST);
+    httpsPort = await findFreePort(HOST);
 
     httpsServer = https.createServer(tlsOptions, (req, res) => {
         handleRequest(req, res).catch(error => {
@@ -426,7 +420,7 @@ async function startHttpsServer(certificate) {
 
     await new Promise((resolve, reject) => {
         httpsServer.once('error', reject);
-        httpsServer.listen(httpsPort, HTTPS_HOST, () => {
+        httpsServer.listen(httpsPort, HOST, () => {
             resolve();
         });
     });
