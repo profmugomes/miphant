@@ -19,7 +19,7 @@ use MiPhantLibs\system\platform;
 $about = new about();
 $translate = new translate();
 $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
-$license = file_get_contents(__DIR__ . '/../LICENSE');
+$license = file_get_contents(__DIR__ . '/../../LICENSE.md');
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $lang; ?>">

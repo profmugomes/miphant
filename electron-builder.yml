@@ -12,7 +12,7 @@ extraResources:
   - "./app/"
   - "./php/LICENSE"
   - "./php/php.ini"
-  - "./LICENSE"
+  - "./LICENSE.md"
   - "./README.md"
 win:
   artifactName: ${productName}-${version}-win.${ext}

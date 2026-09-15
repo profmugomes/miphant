@@ -1,6 +1,6 @@
 {
     "name": "miphant",
-    "version": "5.0.0",
+    "version": "6.0.0",
     "description": "MiPhant is a software that runs applications developed in PHP for desktop Linux Ubuntu and Windows.",
     "main": "main.js",
     "scripts": {
@@ -15,7 +15,7 @@
     },
     "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>",
     "homepage": "https://www.profmugomes.com.br",
-    "license": "MIT",
+    "license": "SEE LICENSE IN LICENSE.md",
     "devDependencies": {
         "electron": "^44.3.0",
         "electron-builder": "^26.4.0"

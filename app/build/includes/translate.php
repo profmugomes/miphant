@@ -1,4 +1,8 @@
 <?php
+// Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All Rights Reserved.
+// Licensed under the PolyForm Perimeter License 1.0.1.
+// See LICENSE.md for details.
+
 $sText = php_sapi_name() == 'cli' ? '' : json_decode(file_get_contents(dirname(__FILE__, 3) . '/langs/' . $_ENV['MIPHANT_LANG'] . '.json'), true);
 function translate($text, ...$values): string
 {

@@ -1,6 +1,7 @@
 <?php
-// Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>
-// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All Rights Reserved.
+// Licensed under the PolyForm Perimeter License 1.0.1.
+// See LICENSE.md for details.
 
 include_once(__DIR__ . '/includes/config.php');
 include_once(__DIR__ . '/includes/functions.php');

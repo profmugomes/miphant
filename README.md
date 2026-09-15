@@ -478,10 +478,47 @@ bcmath, calendar, ctype, curl, dom, exif, fileinfo, filter, gd, iconv, mbstring,
 - GitHub: https://github.com/sponsors/profmugomes/
 - LivePix: https://livepix.gg/profmugomes
 
-## License
+## Licença
 
-Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>
+Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. Todos os direitos reservados.
 
-Licensed under the [MIT](https://github.com/profmugomes/miphant/blob/main/LICENSE) license.
+Este projeto está licenciado sob a [PolyForm Perimeter License 1.0.1](https://polyformproject.org/licenses/perimeter/1.0.1).
 
-All contributions to the MiPhant are subject to this license.
+### Resumo
+
+Você pode:
+
+- ✔ Usar o software para qualquer propósito (pessoal, educacional, comercial).
+- ✔ Inspecionar e estudar o código-fonte.
+- ✔ Modificar o software e criar trabalhos derivados.
+- ✔ Distribuir cópias do software (com ou sem modificações).
+
+Você não pode:
+
+- ✖ Fornecer um produto que compita com o software.
+
+### O que é considerado competição?
+
+Um produto compete com o MiPhant se for oferecido como substituto da sua funcionalidade ou valor, independentemente de:
+
+- Como seja projetado ou implantado.
+- Se for fornecido via interface (serviço, biblioteca ou plug-in).
+- Se for portado para outra plataforma ou linguagem de programação.
+- Se for fornecido gratuitamente.
+
+### Exemplos de uso permitido
+
+- Usar o MiPhant para desenvolver aplicações desktop para si mesmo.
+- Usar o MiPhant em ambiente educacional ou de pesquisa.
+- Modificar o MiPhant para atender às suas necessidades.
+- Distribuir o MiPhant para terceiros (sem fins de competição).
+
+### Exemplos de uso NÃO permitido
+
+- Criar um produto que funcione como alternativa ao MiPhant.
+- Oferecer um serviço que substitua a funcionalidade do MiPhant.
+- Vender uma versão modificada do MiPhant como produto concorrente.
+
+Consulte os termos completos da licença em [LICENSE.md](LICENSE.md).
+
+Este resumo é fornecido apenas para conveniência.
