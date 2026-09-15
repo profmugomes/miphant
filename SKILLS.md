@@ -1,610 +1,715 @@
-# SKILLS.md - Habilidades para Desenvolvimento MiPhant
+# SKILLS.md — MiPhant Developer Guide
 
-## 1. Arquitetura do Sistema
-
-### Visão Geral
-
-MiPhant é uma aplicação desktop que executa PHP como app desktop. O fluxo é:
-
-```
-Electron (Renderer) → Node.js (Main) → HTTPS Server → PHP Protocol → PHP
-```
-
-### Camadas
-
-| Camada | Tecnologia | Responsabilidade |
-|---|---|---|
-| **Renderer** | HTML/CSS/JS + PHP | Interface do usuário, executada no Chromium |
-| **Main Process** | Node.js + Electron | Gerenciamento de janelas, menus, IPC |
-| **HTTP Server** | Node.js `https` | Servidor HTTPS local com certificado self-signed |
-| **PHP Protocol** | Protocolo TCP | Comunicação com PHP via sockets (PHP-FPM/CGI) |
-| **PHP Runtime** | PHP-FPM (Linux) / PHP-CGI (Windows) | Execução do código PHP |
-
-### Fluxo de uma Request PHP
-
-1. Renderer faz request HTTPS para `https://localhost:PORT/page.php`
-2. `http-server.js` recebe o request
-3. Verifica se é arquivo estático ou PHP
-4. Para PHP: chama `executePhp()` → `executePhpProtocol()`
-5. `php-protocol.js` abre socket TCP para o PHP
-6. Envia parâmetros CGI + body via protocolo
-7. Recebe resposta (headers + body)
-8. `parsePhpResponse()` extrai status, headers, body
-9. Retorna resposta HTTP para o renderer
+> Guia para desenvolvimento de aplicações PHP desktop com MiPhant.
+> Todos os arquivos listados estão na pasta `app/` da aplicação.
 
 ---
 
-## 2. Arquivos do Projeto
-
-### Arquivos Principais
-
-| Arquivo | Função | Dependências |
-|---|---|---|
-| `main.js` | Entry point do Electron Main Process | electron, server/* |
-| `preload.js` | Bridge entre Renderer e Main (contextBridge) | electron |
-| `mifunctions.js` | Handlers IPC (dialog, tray, notifications) | electron |
-| `milang.js` | Sistema de internacionalização (i18n) | fs, child_process |
-
-### Arquivos do Servidor
-
-| Arquivo | Função | Responsabilidades |
-|---|---|---|
-| `server/http-server.js` | Servidor HTTPS | Criar server, rotear requests, servir arquivos estáticos |
-| `server/php-protocol.js` | Protocolo PHP | Criar/parsear registros, executar requests via TCP |
-| `server/config.js` | Config centralizada | HOST, portas, timeouts, limites |
-| `server/php-manager.js` | Gerenciamento PHP | Iniciar/parar PHP, criar configs FPM |
-| `server/certificates.js` | Certificados TLS | Gerar certificado self-signed |
-| `server/logger.js` | Logger | Log condicional (verbose), error/warn sempre visíveis |
-| `server/utils.js` | Utilitários | `exists()`, `findFreePort()`, `waitForPort()`, `getMimeType()` |
-
-### Arquivos de Configuração
-
-| Arquivo | Formato | Descrição |
-|---|---|---|
-| `app/config.json` | JSON | Configurações gerais do app |
-| `app/menus/*.json` | JSON | Definições de menus |
-| `app/langs/*.json` | JSON | Traduções (i18n) |
-| `php/php.ini` | INI | Configurações do PHP |
-| `electron-builder.yml` | YAML | Configuração de build |
-
-### Estrutura de `app/config.json`
-
-```json
-{
-  "app": {
-    "id": "miphant",
-    "name": "MiPhant",
-    "version": "6.0.0",
-    "width": 800,
-    "height": 600,
-    "resizable": true,
-    "frame": true,
-    "hide": false,
-    "icon": "miphant.png",
-    "disableAccelerationHardware": true
-  },
-  "server": {
-    "perm": false,
-    "router": false
-  },
-  "dev": {
-    "menu": true,
-    "tools": false
-  }
-}
-```
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `app.width` | number | Largura da janela |
-| `app.height` | number | Altura da janela |
-| `app.resizable` | boolean | Permite redimensionar |
-| `app.frame` | boolean | Mostra barra de título |
-| `app.hide` | boolean | Inicia oculta |
-| `server.perm` | boolean | Permissões de administrador |
-| `server.router` | boolean | URL routing (front controller pattern) para frameworks PHP |
-| `dev.menu` | boolean | Mostra menu de desenvolvimento |
-| `dev.tools` | boolean | Abre DevTools automaticamente |
-
-### Estrutura de Diretórios
+## 1. Estrutura da Aplicação
 
 ```
-miphant/
-├── main.js                    # Entry point Electron
-├── preload.js                 # Context bridge
-├── mifunctions.js             # IPC handlers
-├── milang.js                  # i18n
-├── server/
-│   ├── http-server.js         # HTTPS server
-│   ├── php-protocol.js        # PHP protocol (TCP)
-│   ├── config.js              # Config centralizada
-│   ├── php-manager.js         # PHP process manager
-│   ├── certificates.js        # TLS certificates
-│   ├── logger.js              # Logger centralizado
-│   └── utils.js               # Utilities
-├── php/
-│   ├── php-fpm                # Linux PHP binary
-│   ├── php-cgi.exe            # Windows PHP binary
-│   └── php.ini                # PHP config
-├── app/
-│   ├── config.json            # App config
-│   ├── index.php              # Entry point PHP
-│   ├── langs/                 # Translations
-│   ├── menus/                 # Menu definitions
-│   └── *.php                  # Pages de exemplo
-├── staticphp/
-│   ├── linux/                 # PHP binaries Linux
-│   └── win32/                 # PHP binaries Windows
-├── tests/
-│   └── test-libs.php          # Suite de testes MiPhantLibs
-├── package.json               # Node.js dependencies
-├── LICENSE.md                 # PolyForm Perimeter 1.0.1
-└── electron-builder.yml       # Build config
+app/
+├── config.json              # Configuração do app (janela, versão, etc.)
+├── menus/
+│   ├── menu.json            # Menu principal
+│   └── *.json               # Menus customizados por página
+├── langs/
+│   ├── en.json              # Inglês (fallback padrão)
+│   └── pt.json              # Português
+├── libs/                    # MiPhantLibs (biblioteca PHP)
+│   ├── app/                 # Classes de aplicação
+│   ├── langs/               # Tradução
+│   ├── system/              # Sistema
+│   └── security/            # Segurança
+├── style.css                # Design system dark
+├── index.php                # Página inicial
+└── *.php                    # Páginas da aplicação
 ```
+
+### Arquivos acessíveis
+
+| Pasta | Conteúdo | Acesso |
+|---|---|---|
+| `app/*.php` | Páginas PHP da aplicação | Leitura/escrita pelo PHP |
+| `app/config.json` | Configuração | Leitura pelo PHP |
+| `app/menus/*.json` | Definições de menu | Leitura pelo Electron |
+| `app/langs/*.json` | Traduções | Leitura pelo PHP |
+| `app/libs/` | MiPhantLibs | Leitura pelo PHP |
+| `app/style.css` | Design system | Leitura pelo HTML |
+
+> **Nota**: Arquivos internos do servidor (`server/`, `node_modules/`, etc.) estão empacotados dentro do ASAR e não são acessíveis diretamente pela aplicação PHP.
 
 ---
 
-## 3. APIs do MiPhant
+## 2. Navegação
 
-### API JavaScript (Renderer → Main)
+### Como funciona
 
-A API é exposta via `window.miphant.*` no renderer. Definida em `preload.js`:
+MiPhant usa HTTPS local para servir páginas PHP. O Electron carrega uma URL HTTPS que aponta para o servidor interno. O PHP é executado e retorna HTML que é renderizado no Chromium.
 
+### Navegação entre páginas
+
+**1. Links HTML diretos:**
+```html
+<a href="outra-pagina.php">Ir para outra página</a>
+```
+
+**2. Via JavaScript (miphant API):**
 ```javascript
-// Versão
-miphant.version('miphant')  // 'electron' | 'node' | 'chromium'
+// Navega na janela atual
+window.location.assign('outra-pagina.php');
 
-// Diálogos
-miphant.alert(title, msg, type, button)
-miphant.confirm(title, msg, type, ...buttons)
-miphant.selectDirectory()
-miphant.openFile(multi)
-miphant.saveFile()
+// Abre em nova janela
+miphant.newWindow('outra-pagina.php', 800, 600, true, true, false, 'menu');
 
-// Janelas
-miphant.newWindow(url, width, height, resizable, frame, hide, menu)
-miphant.openURL(url)
-miphant.close()
-
-// Sistema
-miphant.translate(text, ...values)
-miphant.notification(title, text)
-miphant.tray(title, tooltip, icon, menu)
-miphant.fileExists(filename)
-miphant.exportPDF(filename, options)
-miphant.devTools()
+// Redireciona com parâmetros
+window.location.assign('pagina.php?id=42&nome=teste');
 ```
 
-### Parâmetros de `miphant.newWindow()`
-
-| Parâmetro | Tipo | Padrão | Descrição |
-|---|---|---|---|
-| `url` | string | `''` | URL relativa (ex: `'page.php'`) |
-| `width` | number | `config.app.width` | Largura em pixels |
-| `height` | number | `config.app.height` | Altura em pixels |
-| `resizable` | boolean | `config.app.resizable` | Permite redimensionar |
-| `frame` | boolean | `config.app.frame` | Mostra barra de título |
-| `hide` | boolean | `config.app.hide` | Inicia oculta |
-| `menu` | string | `'menu'` | Nome do arquivo de menu (sem `.json`) |
-
-### PHP → JavaScript (via executeJavaScript)
-
-O PHP pode chamar funções JS do renderer via `executeJavaScript`:
-
+**3. Via PHP (MiPhantLibs):**
 ```php
-// No PHP
-echo '<script>window.location.assign("page.php");</script>';
+use MiPhantLibs\app\functions;
+
+$func = new functions();
+
+// Redireciona (gera <script>window.location.assign(...)</script>)
+$func->redirect('outra-pagina.php');
+
+// Redireciona com parâmetros
+$func->redirect('pagina.php', ['id' => 42, 'nome' => 'teste']);
+
+// Abre nova janela
+$func->newWindow('pagina.php', 1024, 768);
+
+// Abre URL externa no navegador do sistema
+$func->openURL('https://example.com');
+
+// Fecha a janela atual
+$func->closeWindow();
 ```
 
----
+### Menu Principal
 
-## 4. Protocolo FastCGI
+O menu é definido em `app/menus/menu.json`. Cada página pode ter um menu customizado criando um arquivo JSON com o mesmo nome.
 
-### Estrutura de um Request
-
-```
-1. FCGI_BEGIN_REQUEST (requestId, FCGI_RESPONDER, FCGI_KEEP_CONN=0)
-2. FCGI_PARAMS (chave=valor, chunked se > 65535 bytes)
-3. FCGI_PARAMS vazio (fim dos params)
-4. FCGI_STDIN (body, chunked se > 65535 bytes)
-5. FCGI_STDIN vazio (fim do body)
-```
-
-### Estrutura de uma Resposta
-
-```
-1. FCGI_STDOUT (headers PHP + body)
-2. FCGI_END_REQUEST (appStatus, protocolStatus)
-```
-
-### Parâmetros CGI Enviados
-
-| Parâmetro | Exemplo | Descrição |
-|---|---|---|
-| `GATEWAY_INTERFACE` | `CGI/1.1` | Versão CGI |
-| `SERVER_SOFTWARE` | `MiPhant` | Nome do servidor |
-| `SERVER_PROTOCOL` | `HTTP/1.1` | Versão do protocolo |
-| `REQUEST_METHOD` | `GET` | Método HTTP |
-| `REQUEST_URI` | `/page.php` | URI original (com query string) |
-| `SCRIPT_NAME` | `/page.php` | Nome do script (ajustado para `/index.php` quando roteado) |
-| `SCRIPT_FILENAME` | `/full/path/page.php` | Caminho do arquivo PHP |
-| `DOCUMENT_ROOT` | `/path/to/app` | Raiz do documento |
-| `QUERY_STRING` | `key=value` | Parâmetros GET |
-| `SERVER_NAME` | `localhost` | Nome do servidor |
-| `SERVER_PORT` | `8443` | Porta do servidor |
-| `REMOTE_ADDR` | `127.0.0.1` | IP do cliente |
-| `HTTPS` | `on` | Indica HTTPS |
-| `REDIRECT_STATUS` | `200` | Status de redirecionamento |
-| `HTTP_*` | `HTTP_COOKIE=...` | Headers HTTP (whitelist) |
-
-### Headers CGI (Blacklist)
-
-Seguindo o padrão de Apache/Nginx, todos os headers HTTP são passados ao PHP como variáveis `HTTP_*`. Apenas headers perigosos conhecidos são bloqueados:
-
-| Header | Motivo do bloqueio |
-|---|---|
-| `proxy` | Vulnerabilidade httpoxy |
-| `proxy-connection` | Controle de proxy |
-| `x-forwarded-for` | Pode ser forjado para falsificar IP |
-| `x-forwarded-host` | Pode ser forjado para falsificar host |
-| `x-forwarded-proto` | Pode ser forjado para forçar HTTPS |
-| `x-real-ip` | Pode ser forjado para falsificar IP |
-
-### URL Routing (Front Controller)
-
-Quando `server.router = true` no `app/config.json`, URLs que não correspondem a arquivos físicos são roteadas para `index.php` (front controller). Isso permite frameworks PHP como Laravel, Symfony, CodeIgniter, Slim, WordPress, etc.
-
-**Fluxo:**
-
-```
-Request: GET /dashboard
-   │
-   ├─ Arquivo físico existe? → SIM → servir diretamente
-   │
-   └─ Não existe → router habilitado?
-      ├─ SIM → executar index.php (REQUEST_URI preservada)
-      └─ NÃO → 404
-```
-
-**Parâmetros CGI quando roteado (`isRouted = true`):**
-
-| Parâmetro | Valor | Observação |
-|---|---|---|
-| `SCRIPT_FILENAME` | `/path/public/index.php` | Aponta para o front controller |
-| `SCRIPT_NAME` | `/index.php` | Ajustado automaticamente |
-| `REQUEST_URI` | `/dashboard` | URL original preservada |
-
-**Exemplos de compatibilidade:**
-
-| Framework | Front Controller | Funciona? |
-|---|---|---|
-| Laravel | `public/index.php` | ✅ |
-| Symfony | `public/index.php` | ✅ |
-| CodeIgniter | `public/index.php` | ✅ |
-| Slim | `public/index.php` | ✅ |
-| WordPress | `index.php` | ✅ |
-
----
-
-## 5. PHP no MiPhant
-
-### Execução por Plataforma
-
-| Plataforma | Binário | Modo | Porta | Concorrência |
-|---|---|---|---|---|
-| **Linux** | `php-fpm` | Process manager | Dinâmica | ✅ Pool de workers |
-| **Windows** | `php-cgi.exe` | FastCGI | Dinâmica | ⚠️ 1 request por vez |
-
-### PHP-FPM (Linux)
-
-Configuração gerada automaticamente em `server/php-manager.js`:
-
-```ini
-[global]
-pid = /path/php-fpm.pid
-error_log = /path/php-fpm.log
-daemonize = no
-
-[www]
-listen = 127.0.0.1:PORT
-listen.backlog = 128
-pm = dynamic
-pm.max_children = <CPUs * 2, máx 16>
-pm.start_servers = 2
-pm.min_spare_servers = 1
-pm.max_spare_servers = <max_children / 2>
-pm.max_requests = 500
-clear_env = no
-catch_workers_output = yes
-request_slowlog_timeout = 5s
-security.limit_extensions = .php
-```
-
-### PHP-CGI (Windows)
-
-Iniciado com:
-```
-php-cgi.exe -b 127.0.0.1:PORT
-```
-
-- Modo FastCGI: processo fica vivo entre requests
-- Single-threaded: processa 1 request por vez
-
-### Variáveis de Ambiente PHP
-
-| Variável | Descrição |
-|---|---|
-| `MIPHANT_ARGV` | Argumentos da linha de comando |
-| `MIPHANT_USERNAME` | Nome do usuário do sistema |
-| `MIPHANT_HOMEDIR` | Diretório home do usuário |
-| `MIPHANT_PLATFORM` | Plataforma (linux/win32/darwin) |
-| `MIPHANT_LANG` | Idioma do sistema |
-
-**Importante**: `$_ENV` requer `variables_order = "EGPCS"` no `php.ini`.
-
-### Extensões PHP
-
-**Comuns**: bcmath, calendar, ctype, date, dom, fileinfo, filter, ftp, hash, iconv, json, libxml, mbstring, openssl, pcntl, pcre, PDO, pdo_sqlite, Phar, posix, readline, Reflection, session, SimpleXML, sodium, SPL, sqlite3, standard, tokenizer, xml, xmlreader, xmlwriter, zip, zlib
-
----
-
-## 6. IPC (Inter-Process Communication)
-
-### Fluxo IPC
-
-```
-Renderer (preload.js) → ipcRenderer.invoke() → Main (mifunctions.js) → ipcMain.handle()
-```
-
-### Registrando um Novo Handler
-
-Em `mifunctions.js`:
-
-```javascript
-ipcMain.handle('appMinhaFuncao', async (_, param1, param2) => {
-    // Lógica aqui
-    return resultado;
-});
-```
-
-Em `preload.js`:
-
-```javascript
-contextBridge.exposeInMainWorld('miphant', {
-    minhaFuncao: (param1, param2) => ipcRenderer.invoke('appMinhaFuncao', param1, param2),
-});
-```
-
-Em PHP (via JS):
-
-```javascript
-window.miphant.minhaFuncao('valor1', 'valor2').then(resultado => {
-    // Usar resultado
-});
-```
-
----
-
-## 7. Menu
-
-### Estrutura de Menu JSON
-
+**Exemplo** — `app/menus/menu.json`:
 ```json
 {
-  "Arquivo": {
-    "Novo": { "page": "new.php", "key": "CmdOrCtrl+N", "newwindow": true },
-    "separator1": {},
-    "Sair": { "script": "miphant.close();" }
-  },
-  "Ajuda": {
-    "Sobre": { "page": "about.php", "key": "F1" }
-  }
+    "Home": {
+        "Home": {
+            "page": "index.php",
+            "key": "Ctrl+H"
+        }
+    },
+    "Arquivo": {
+        "Abrir": {
+            "page": "openfile.php",
+            "key": "Ctrl+O"
+        },
+        "Salvar": {
+            "page": "savefile.php",
+            "key": "Ctrl+S"
+        },
+        "separator1": {},
+        "Sair": {
+            "script": "miphant.close();"
+        }
+    },
+    "Ajuda": {
+        "Sobre": {
+            "page": "about.php",
+            "key": "F1"
+        }
+    }
 }
 ```
 
-### Propriedades
+**Propriedades de cada item:**
 
 | Propriedade | Tipo | Descrição |
 |---|---|---|
-| `page` | string | URL da página (relativa) |
-| `url` | string | URL externa (abre no navegador) |
+| `page` | string | Página PHP para navegar |
+| `url` | string | URL externa (abre no navegador do sistema) |
 | `script` | string | JavaScript para executar |
-| `key` | string | Atalho de teclado |
-| `newwindow` | boolean | Abre em nova janela |
-| `width` | number | Largura (se newwindow=true) |
-| `height` | number | Altura (se newwindow=true) |
-| `type` | string | Tipo do item (ex: 'checkbox') |
+| `key` | string | Atalho de teclado (formato Electron) |
+| `newwindow` | boolean | Abre em nova janela (padrão: false) |
+| `width` | number | Largura da nova janela |
+| `height` | number | Altura da nova janela |
+| `resizable` | boolean | Permite redimensionar |
+| `frame` | boolean | Mostra barra de título |
+| `hide` | boolean | Inicia oculta |
+
+### Menu Customizado por Página
+
+Para criar um menu específico para uma página:
+
+1. Crie o arquivo PHP: `app/minha-pagina.php`
+2. Crie o menu JSON: `app/menus/minha-pagina.json`
+3. Ao abrir a janela, passe o nome do menu:
+   ```javascript
+   miphant.newWindow('minha-pagina.php', 800, 600, true, true, false, 'minha-pagina');
+   ```
 
 ---
 
-## 8. Build e Distribuição
+## 3. MiPhantLibs — Biblioteca PHP
 
-### Comandos
+Biblioteca incluída em `app/libs/`. Não requer Composer — os arquivos são carregados via `require_once`.
 
-```bash
-npm install              # Instalar dependências
-npm run start            # Executar em desenvolvimento
-npm run dist-linux       # Build para Linux
-npm run dist-win         # Build para Windows (via Docker)
-./compile.sh             # Build completo (Linux + Windows)
+### Carregando as libs
+
+```php
+require_once __DIR__ . '/libs/app/config.php';
+require_once __DIR__ . '/libs/app/functions.php';
+require_once __DIR__ . '/libs/app/path.php';
+require_once __DIR__ . '/libs/app/file.php';
+require_once __DIR__ . '/libs/langs/translate.php';
+require_once __DIR__ . '/libs/system/server.php';
+require_once __DIR__ . '/libs/system/env.php';
+require_once __DIR__ . '/libs/system/platform.php';
 ```
 
-### electron-builder.yml
+### Namespace `MiPhantLibs\app`
 
-```yaml
-win:
-  extraResources:
-   - from: "./php/php.exe"
-     to: "php/php.exe"
-linux:
-  extraResources:
-   - from: "./php/php"
-     to: "php/php"
+#### `config`
+Lê valores de `app/config.json`.
+
+```php
+use MiPhantLibs\app\config;
+
+$cfg = new config();
+$width = $cfg->get('app', 'width');        // 800
+$version = $cfg->get('app', 'version');    // "6.0.0"
+$author = $cfg->get('app', 'author', 'name'); // "Murilo Gomes"
 ```
 
-### Output
+#### `functions`
+Gera chamadas JavaScript via preload.
 
-- `dist/` — Pacotes gerados
-- `dist/linux-unpacked/` — App Linux descompactado
-- `dist/win-unpacked/` — App Windows descompactado
+```php
+use MiPhantLibs\app\functions;
+
+$func = new functions();
+
+// Alert (envolto em <script> automaticamente)
+$func->alert('Titulo', 'Mensagem', 'info');
+
+// Confirm com callback
+$func->confirm('Titulo', 'Deseja continuar?', 'question',
+    function () { echo "Confirmado!"; },
+    function () { echo "Cancelado!"; }
+);
+
+// Nova janela
+$func->newWindow('pagina.php', 800, 600);
+
+// Redireciona
+$func->redirect('outra-pagina.php', ['id' => 1]);
+
+// Notificação desktop
+$func->notification('Titulo', 'Corpo da notificação');
+
+// System tray
+$func->tray('App', 'Tooltip', '', [
+    ['label' => 'Home', 'page' => 'index.php'],
+    ['label' => 'Sair', 'script' => 'miphant.close();']
+]);
+
+// Sem tags <script> (para uso inline)
+$func->noTag()->alert('Titulo', 'Msg', 'info');
+```
+
+#### `file`
+Operações com arquivos.
+
+```php
+use MiPhantLibs\app\file;
+
+$file = new file();
+
+$file->create('/tmp/teste.txt');                    // Cria arquivo
+$file->save('/tmp/teste.txt', 'conteúdo');          // Salva (substitui)
+$file->save('/tmp/teste.txt', 'mais', false);       // Salva (append)
+$content = $file->open('/tmp/teste.txt');            // Lê conteúdo
+$exists = $file->exists('/tmp/teste.txt');           // Verifica existência
+$file->remove('/tmp/teste.txt');                     // Remove arquivo
+$hasExt = $file->checkExtension('arquivo.txt', 'txt'); // Verifica extensão
+```
+
+#### `folder`
+Operações com pastas.
+
+```php
+use MiPhantLibs\app\folder;
+
+$folder = new folder();
+
+$folder->create('/tmp/pasta/subpasta');             // Cria pasta recursiva
+$folder->remove('/tmp/pasta', true);                 // Remove recursivamente
+$exists = $folder->exists('/tmp/pasta');             // Verifica existência
+```
+
+#### `path`
+Construtor de caminhos cross-platform.
+
+```php
+use MiPhantLibs\app\path;
+
+$path = new path();
+$full = $path->join('app', 'data', 'file.txt');
+// Linux:   "app/data/file.txt"
+// Windows: "app\data\file.txt"
+```
+
+#### `text`
+Manipulação de texto.
+
+```php
+use MiPhantLibs\app\text;
+
+$text = new text();
+
+$text->removeAccent('São Paulo');        // "Sao Paulo"
+$text->removeSpecialCharacters('a/b*c'); // "abc"
+$text->separator('São Paulo');           // "Sao-Paulo"
+```
+
+#### `numbers`
+Formatação de números.
+
+```php
+use MiPhantLibs\app\numbers;
+
+$numbers = new numbers();
+
+$numbers->currencyReal('1234.56');  // "1.234,56"
+$numbers->format('5');              // "05"
+```
+
+#### `datetime`
+Manipulação de datas.
+
+```php
+use MiPhantLibs\app\datetime;
+
+$dt = new datetime();
+
+$dt->date();                                    // "15/09/2025"
+$dt->now();                                     // "15/09/2025 14:30:00"
+$dt->change('15/09/2025', 'd/m/Y', 'Y-m-d');   // "2025-09-15"
+$dt->dayOfTheWeek('2025-09-15');                 // "Monday"
+$dt->monthInFull(9);                             // "September"
+```
+
+#### `arrays`
+Manipulação de arrays.
+
+```php
+use MiPhantLibs\app\arrays;
+
+$arr = new arrays();
+
+$arr->check('hello world', 'hello');  // true
+$arr->check('hello world', 'xyz');    // false
+
+$data = ['user' => ['name' => 'John']];
+$arr->getCustom($data, 'user', 'name'); // "John"
+```
+
+#### `about`
+Página sobre com informações do sistema.
+
+```php
+use MiPhantLibs\app\about;
+
+$about = new about();
+$about->show(); // Exibe informações do app + licenças
+```
+
+### Namespace `MiPhantLibs\langs`
+
+#### `translate`
+Tradução i18n com cadeia de fallback.
+
+```php
+use MiPhantLibs\langs\translate;
+
+$translate = new translate();
+
+echo $translate->get('Continue');                        // "Continuar"
+echo $translate->get('Unable to find file %s', 'x.php'); // "Não foi possível encontrar o arquivo x.php"
+```
+
+**Cadeia de fallback**: `pt-br` → `pt.json` → `en.json`
+
+### Namespace `MiPhantLibs\system`
+
+#### `env`
+Acessa variáveis de ambiente do MiPhant.
+
+```php
+use MiPhantLibs\system\env;
+
+$env = new env();
+
+$env->get('MIPHANT_CUSTOM_VAR');  // Variável personalizada
+$env->username();                  // Nome do usuário
+$env->lang();                      // Idioma (ex: 'pt-br')
+$env->platform();                  // Plataforma (ex: 'linux')
+$env->homeDir();                   // Diretório home
+$env->argv();                      // Argumentos da linha de comando
+```
+
+**Variáveis disponíveis via `$_ENV`:**
+
+| Variável | Descrição |
+|---|---|
+| `$_ENV['MIPHANT_LANG']` | Idioma do sistema |
+| `$_ENV['MIPHANT_USERNAME']` | Nome do usuário |
+| `$_ENV['MIPHANT_HOMEDIR']` | Diretório home |
+| `$_ENV['MIPHANT_PLATFORM']` | Plataforma (linux/win32) |
+| `$_ENV['MIPHANT_ARGV']` | Argumentos CLI |
+
+#### `server`
+Informações do servidor.
+
+```php
+use MiPhantLibs\system\server;
+
+$server = new server();
+
+$server->domain();        // "https://localhost:8443"
+$server->uri();           // URI atual (ex: '/page.php')
+$server->documentroot();  // Raiz do app (ex: '/path/to/app/public')
+```
+
+#### `platform`
+Detecção de plataforma.
+
+```php
+use MiPhantLibs\system\platform;
+
+$platform = new platform();
+
+$platform->osLinux();    // true no Linux
+$platform->osWindows();  // true no Windows
+```
+
+### Namespace `MiPhantLibs\security`
+
+#### `items`
+Sanitização de entrada.
+
+```php
+use MiPhantLibs\security\items;
+
+$items = new items();
+
+$items->clean('<script>alert(1)</script>hello'); // "hello"
+$items->clean(null);                             // ""
+$items->clean('  texto  ');                      // "texto"
+```
+
+#### `get` / `post`
+Leitura segura de parâmetros GET/POST.
+
+```php
+use MiPhantLibs\security\get;
+use MiPhantLibs\security\post;
+
+$get = new get();
+$post = new post();
+
+$value = $get->get('id');           // Lê $_GET['id']
+$exists = $get->exists('id');       // Verifica se existe
+$isGet = $get->request();           // true se método GET
+
+$value = $post->get('nome');        // Lê $_POST['nome']
+$exists = $post->exists('nome');    // Verifica se existe
+$isPost = $post->request();         // true se método POST
+```
 
 ---
 
-## 9. Padrões de Código
+## 4. Preload API — JavaScript
 
-### Nomenclatura
+O objeto `miphant` está disponível no renderer (JavaScript do navegador) via `preload.js`.
 
-| Tipo | Padrão | Exemplo |
-|---|---|---|
-| Variáveis | camelCase | `phpPort`, `httpsServer` |
-| Funções | camelCase | `startPhp()`, `getPhpPort()` |
-| Constantes | UPPER_SNAKE | `PHP_PROTOCOL_HOST`, `MAX_BODY_SIZE` |
-| Arquivos | kebab-case | `php-manager.js`, `http-server.js` |
-| IPC handlers | camelCase com prefixo `app` | `appNewWindow`, `appSair` |
+### Aplicação
 
-### Tratamento de Erros
+| Método | Descrição |
+|---|---|
+| `miphant.version(type)` | Versão: `'miphant'`, `'electron'`, `'node'`, `'chromium'` |
+| `miphant.close()` | Fecha a aplicação |
+
+### Diálogos
+
+| Método | Descrição |
+|---|---|
+| `miphant.alert(title, msg, type, button)` | Caixa de alerta |
+| `miphant.confirm(title, msg, type, ...buttons)` | Caixa de confirmação |
+| `miphant.openFile(multi)` | Diálogo de abrir arquivo |
+| `miphant.saveFile()` | Diáquivo de salvar arquivo |
+| `miphant.selectDirectory()` | Diálogo de selecionar pasta |
+
+### Janelas
+
+| Método | Descrição |
+|---|---|
+| `miphant.newWindow(url, width, height, resizable, frame, hide, menu)` | Abre nova janela |
+| `miphant.openURL(url)` | Abre URL no navegador do sistema |
+
+### Sistema
+
+| Método | Descrição |
+|---|---|
+| `miphant.notification(title, text)` | Notificação desktop |
+| `miphant.tray(title, tooltip, icon, menus)` | Configura system tray |
+| `miphant.devTools()` | Abre DevTools |
+| `miphant.fileExists(filename)` | Verifica se arquivo existe |
+| `miphant.exportPDF(filename, options)` | Exporta página como PDF |
+
+### Tradução
+
+| Método | Descrição |
+|---|---|
+| `miphant.translate(text, ...values)` | Traduz usando arquivos de idioma |
+
+### Exemplos
 
 ```javascript
-// Sempre usar try/catch em funções async
-async function startPhp() {
-    try {
-        // Lógica
-    } catch (error) {
-        console.error('[PHP] Erro:', error);
-        throw error; // Re-throw para o caller decidir
+// Alert
+miphant.alert('Info', 'Mensagem', 'info', 'OK');
+
+// Confirm
+const result = await miphant.confirm(
+    'Confirmar', 'Deseja continuar?', 'question', 'Sim', 'Não'
+);
+if (result === 0) { /* Sim */ } else { /* Não */ }
+
+// Nova janela
+miphant.newWindow('pagina.php', 1024, 768, true, true, false, 'menu');
+
+// Notificação
+miphant.notification('Titulo', 'Corpo da mensagem');
+
+// System tray
+miphant.tray('App', 'Tooltip', '', JSON.stringify({
+    "Home": { page: "index.php" },
+    "Fechar": { script: "window.close();" }
+}));
+
+// Versão
+const version = await miphant.version('miphant');
+```
+
+---
+
+## 5. Design System
+
+MiPhant inclui um design system dark em `app/style.css`.
+
+### Usando
+
+```html
+<link rel="stylesheet" href="style.css">
+```
+
+### Componentes
+
+| Classe | Descrição |
+|---|---|
+| `.card` | Container com fundo escuro |
+| `.btn` | Botão base |
+| `.btn-primary` | Botão de ação principal |
+| `.btn-outline` | Botão contornado |
+| `.btn-success` | Botão de sucesso |
+| `.badge` | Label pequena |
+| `.badge-info` | Badge informativo |
+| `.grid` | Grid responsivo |
+| `.grid-4` | Grid com 4 colunas |
+| `.stat` | Bloco de estatística |
+| `.stat-value` | Valor da estatística |
+| `.stat-label` | Label da estatística |
+| `.text-muted` | Texto com cor suave |
+| `.text-success` | Texto de sucesso |
+| `.text-danger` | Texto de erro |
+| `.collapsible` | Botão colapsável |
+| `.mt-1`, `.mt-2`, `.mt-3` | Margem superior |
+| `.mb-1`, `.mb-2`, `.mb-3` | Margem inferior |
+
+---
+
+## 6. Configuração
+
+O app é configurado via `app/config.json`:
+
+```json
+{
+    "app": {
+        "id": "miphant",
+        "name": "MiPhant",
+        "version": "6.0.0",
+        "width": 800,
+        "height": 600,
+        "resizable": true,
+        "frame": true,
+        "hide": false,
+        "icon": "miphant.png",
+        "disableAccelerationHardware": true,
+        "author": {
+            "name": "Murilo Gomes",
+            "email": "profmugomes@gmail.com",
+            "url": "https://www.profmugomes.com.br"
+        },
+        "homepage": "https://github.com/profmugomes/miphant/",
+        "license": "SEE LICENSE IN LICENSE.md",
+        "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
+    },
+    "server": {
+        "perm": true,
+        "router": false
+    },
+    "dev": {
+        "menu": false,
+        "tools": false
     }
 }
-
-// IPC handlers retornam valores, não lançam erros
-ipcMain.handle('appMinhaFuncao', async (_, param) => {
-    try {
-        return { success: true, data: resultado };
-    } catch (error) {
-        return { success: false, error: error.message };
-    }
-});
 ```
 
-### Logs
+### Opções
 
+**app**
+- `id`: Identificador da aplicação
+- `name`: Nome exibido
+- `version`: Versão
+- `width` / `height`: Dimensões da janela
+- `resizable`: Permite redimensionar
+- `frame`: Mostra barra de título
+- `hide`: Inicia com janela oculta
+- `icon`: Arquivo de ícone
+- `disableAccelerationHardware`: Desabilita aceleração GPU
+- `author`: Informações do autor (name, email, url)
+- `homepage`: URL do projeto
+- `license`: Tipo de licença
+- `copyright`: Aviso de copyright
+
+**server**
+- `perm`: Aplica permissão de execução no binário PHP (Linux)
+- `router`: Habilita roteamento PHP (front controller pattern)
+
+**dev**
+- `menu`: Mostra menu de desenvolvimento
+- `tools`: Abre DevTools automaticamente
+
+---
+
+## 7. Idiomas
+
+### Estrutura
+
+Crie arquivos JSON em `app/langs/` com o código do idioma:
+
+```
+app/langs/
+├── en.json    # Inglês (fallback padrão)
+├── pt.json    # Português
+└── pt-br.json # Português do Brasil
+```
+
+### Formato
+
+```json
+{
+    "Continue": "Continuar",
+    "Cancel": "Cancelar",
+    "Unable to find file %s": "Não foi possível encontrar o arquivo %s"
+}
+```
+
+### Cadeia de fallback
+
+Quando um idioma é detectado (ex: `pt-br`), o sistema tenta:
+
+1. `pt-br.json` — correspondência exata
+2. `pt.json` — idioma base
+3. `en.json` — fallback inglês
+
+### Usando
+
+**PHP:**
+```php
+$translate = new translate();
+echo $translate->get('Continue'); // "Continuar"
+```
+
+**JavaScript:**
 ```javascript
-console.log('[PHP] Iniciando...');      // Info
-console.error('[PHP] Erro:', error);    // Erro
-console.warn('[PHP] Aviso...');         // Warning
+const text = await miphant.translate('Continue');
 ```
 
-### Async/Await
-
-```javascript
-// Sempre usar async/await em vez de callbacks
-const port = await findFreePort(PHP_PROTOCOL_HOST);
-await waitForPort(PHP_PROTOCOL_HOST, port, 10000);
-await startPhp(resourcesPath, userDataPath);
+**HTML (via PHP):**
+```php
+$lang = $_ENV['MIPHANT_LANG'] ?? 'en';
+?>
+<html lang="<?php echo $lang; ?>">
 ```
 
 ---
 
-## 10. Checklist para Modificações
+## 8. Checklist para Novas Páginas
 
-### Ao adicionar nova funcionalidade IPC:
+### Criando uma nova página
 
-- [ ] Adicionar handler em `mifunctions.js`
-- [ ] Adicionar API em `preload.js`
-- [ ] Documentar em `SKILLS.md`
-- [ ] Testar no renderer via `window.miphant.*`
+- [ ] Criar arquivo PHP em `app/minha-pagina.php`
+- [ ] Adicionar `<link rel="stylesheet" href="style.css">`
+- [ ] Definir `<html lang="<?php echo $lang; ?>">`
+- [ ] Adicionar link de volta: `<a href="index.php" class="btn btn-outline">← Back</a>`
+- [ ] Adicionar ao menu em `app/menus/menu.json`
 
-### Ao modificar o servidor HTTP:
+### Usando MiPhantLibs
 
-- [ ] Verificar headers blacklist
-- [ ] Verificar path traversal protection
-- [ ] Testar com arquivos estáticos
-- [ ] Testar com PHP
+- [ ] Incluir arquivos necessários com `require_once`
+- [ ] Usar `use` para importar classes
+- [ ] Tratar erros com try/catch quando necessário
 
-### Ao modificar o protocolo PHP:
+### Usando Preload API
 
-- [ ] Testar start/stop do PHP
-- [ ] Verificar cleanup de processos
-- [ ] Verificar timeout
-- [ ] Testar em Linux E Windows
+- [ ] Usar `miphant.*` no JavaScript
+- [ ] Usar `async/await` para chamadas que retornam Promise
+- [ ] Verificar valores de retorno antes de usar
 
-### Ao modificar menus:
+### Usando Design System
 
-- [ ] Verificar estrutura JSON
-- [ ] Testar todos os tipos (page, url, script)
-- [ ] Verificar traduções
-
-### Ao fazer build:
-
-- [ ] Verificar `electron-builder.yml`
-- [ ] Verificar `extraResources`
-- [ ] Testar em ambas as plataformas
-- [ ] Verificar tamanho do pacote
+- [ ] Usar classes CSS existentes
+- [ ] Seguir padrão dark theme
+- [ ] Manter consistência visual
 
 ---
 
-## 11. Segurança
+## 9. Testes
 
-### Certificados TLS
-
-- Certificado self-signed gerado em `server/certificates.js`
-- Armazenado em `userData/server/certificate/`
-- Electron confia em `localhost`, `127.0.0.1`, `::1`
-
-### Headers de Segurança
-
-- CORS restrito para `https://localhost:PORT`
-- CSP não é necessário para desktop
-- Headers CGI usam blacklist (Apache/Nginx pattern)
-
-### Path Traversal
-
-- `resolvePublicPath()` valida que o caminho está dentro de `publicRoot`
-- Bloqueia `..` e caracteres nulos
-
-### Variáveis de Ambiente
-
-- Apenas variáveis necessárias são copiadas para o PHP
-- Tokens, chaves e variáveis internas do Electron NÃO são expostas
-
----
-
-## 12. Troubleshooting
-
-### PHP não inicia
-
-1. Verificar se o binário existe: `ls -la php/php-fpm` ou `php/php-cgi.exe`
-2. Verificar permissões de execução: `chmod +x php/php-fpm`
-3. Verificar logs: `[PHP] stdout` e `[PHP] stderr`
-4. Verificar se a porta está livre
-
-### Request retorna 502
-
-1. Verificar se o PHP está rodando: `netstat -tlnp | grep PORT`
-2. Verificar logs PHP: `php/php-fpm.log`
-3. Verificar `SCRIPT_FILENAME` correto
-4. Verificar `variables_order = "EGPCS"` no `php.ini`
-
-### Variáveis de ambiente vazias
-
-1. Verificar `php/php.ini`: `variables_order = "EGPCS"`
-2. Verificar `server/php-manager.js`: `getPhpEnvironment()` inclui MIPHANT_*
-3. Verificar `main.js`: `process.env.MIPHANT_*` definidos ANTES de `startPhp()`
-
-### Testes
+### Executar testes
 
 ```bash
 /usr/bin/php8.5 tests/test-libs.php
 ```
 
-### Janela não abre
+### Cobertura
 
-1. Verificar se `startMiPhantServer()` foi chamado
-2. Verificar se o certificado foi gerado
-3. Verificar se a porta HTTPS está livre
-4. Verificar console do Electron (F12)
+- 101 testes cobrindo:
+  - 21 libs PHP (app/, system/, langs/, security/)
+  - 10 arquivos JS (syntax check)
+  - Headers de licença
+  - Funcionalidades de cada classe
 
-### Menu não aparece
+---
 
-1. Verificar se o arquivo JSON existe em `app/menus/`
-2. Verificar estrutura do JSON
-3. Verificar se `config.app.menu = true`
+## 10. Licença
+
+Copyright (c) 2025-2026 Murilo Gomes. All Rights Reserved.
+
+Licensed under the PolyForm Perimeter License 1.0.1.
+See [LICENSE.md](LICENSE.md) for details.
+
+**Resumo**: Você pode usar, modificar e distribuir o software, mas não pode fornecer um produto que compita com ele.
