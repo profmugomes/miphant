@@ -7,7 +7,7 @@
 MiPhant é uma aplicação desktop que executa PHP como app desktop. O fluxo é:
 
 ```
-Electron (Renderer) → Node.js (Main) → HTTPS Server → FastCGI → PHP
+Electron (Renderer) → Node.js (Main) → HTTPS Server → PHP Protocol → PHP
 ```
 
 ### Camadas
@@ -17,7 +17,7 @@ Electron (Renderer) → Node.js (Main) → HTTPS Server → FastCGI → PHP
 | **Renderer** | HTML/CSS/JS + PHP | Interface do usuário, executada no Chromium |
 | **Main Process** | Node.js + Electron | Gerenciamento de janelas, menus, IPC |
 | **HTTP Server** | Node.js `https` | Servidor HTTPS local com certificado self-signed |
-| **FastCGI** | Protocolo TCP | Comunicação com PHP via sockets |
+| **PHP Protocol** | Protocolo TCP | Comunicação com PHP via sockets (PHP-FPM/CGI) |
 | **PHP Runtime** | PHP-FPM (Linux) / PHP-CGI (Windows) | Execução do código PHP |
 
 ### Fluxo de uma Request PHP
@@ -25,9 +25,9 @@ Electron (Renderer) → Node.js (Main) → HTTPS Server → FastCGI → PHP
 1. Renderer faz request HTTPS para `https://localhost:PORT/page.php`
 2. `http-server.js` recebe o request
 3. Verifica se é arquivo estático ou PHP
-4. Para PHP: chama `executePhp()` → `executeFastCGI()`
-5. `fastcgi.js` abre socket TCP para o PHP
-6. Envia parâmetros CGI + body via protocolo FastCGI
+4. Para PHP: chama `executePhp()` → `executePhpProtocol()`
+5. `php-protocol.js` abre socket TCP para o PHP
+6. Envia parâmetros CGI + body via protocolo
 7. Recebe resposta (headers + body)
 8. `parsePhpResponse()` extrai status, headers, body
 9. Retorna resposta HTTP para o renderer
@@ -50,9 +50,11 @@ Electron (Renderer) → Node.js (Main) → HTTPS Server → FastCGI → PHP
 | Arquivo | Função | Responsabilidades |
 |---|---|---|
 | `server/http-server.js` | Servidor HTTPS | Criar server, rotear requests, servir arquivos estáticos |
-| `server/fastcgi.js` | Protocolo FastCGI | Criar/parsear registros, executar requests |
+| `server/php-protocol.js` | Protocolo PHP | Criar/parsear registros, executar requests via TCP |
+| `server/config.js` | Config centralizada | HOST, portas, timeouts, limites |
 | `server/php-manager.js` | Gerenciamento PHP | Iniciar/parar PHP, criar configs FPM |
 | `server/certificates.js` | Certificados TLS | Gerar certificado self-signed |
+| `server/logger.js` | Logger | Log condicional (verbose), error/warn sempre visíveis |
 | `server/utils.js` | Utilitários | `exists()`, `findFreePort()`, `waitForPort()`, `getMimeType()` |
 
 ### Arquivos de Configuração
@@ -72,7 +74,7 @@ Electron (Renderer) → Node.js (Main) → HTTPS Server → FastCGI → PHP
   "app": {
     "id": "miphant",
     "name": "MiPhant",
-    "version": "5.0.0",
+    "version": "6.0.0",
     "width": 800,
     "height": 600,
     "resizable": true,
@@ -114,9 +116,11 @@ miphant/
 ├── milang.js                  # i18n
 ├── server/
 │   ├── http-server.js         # HTTPS server
-│   ├── fastcgi.js             # FastCGI protocol
+│   ├── php-protocol.js        # PHP protocol (TCP)
+│   ├── config.js              # Config centralizada
 │   ├── php-manager.js         # PHP process manager
 │   ├── certificates.js        # TLS certificates
+│   ├── logger.js              # Logger centralizado
 │   └── utils.js               # Utilities
 ├── php/
 │   ├── php-fpm                # Linux PHP binary
@@ -131,7 +135,10 @@ miphant/
 ├── staticphp/
 │   ├── linux/                 # PHP binaries Linux
 │   └── win32/                 # PHP binaries Windows
+├── tests/
+│   └── test-libs.php          # Suite de testes MiPhantLibs
 ├── package.json               # Node.js dependencies
+├── LICENSE.md                 # PolyForm Perimeter 1.0.1
 └── electron-builder.yml       # Build config
 ```
 
@@ -449,9 +456,9 @@ linux:
 
 | Tipo | Padrão | Exemplo |
 |---|---|---|
-| Variáveis | camelCase | `phpFcgiPort`, `httpsServer` |
-| Funções | camelCase | `startPhp()`, `getNextFcgiPort()` |
-| Constantes | UPPER_SNAKE | `FCGI_HOST`, `MAX_BODY_SIZE` |
+| Variáveis | camelCase | `phpPort`, `httpsServer` |
+| Funções | camelCase | `startPhp()`, `getPhpPort()` |
+| Constantes | UPPER_SNAKE | `PHP_PROTOCOL_HOST`, `MAX_BODY_SIZE` |
 | Arquivos | kebab-case | `php-manager.js`, `http-server.js` |
 | IPC handlers | camelCase com prefixo `app` | `appNewWindow`, `appSair` |
 
@@ -490,8 +497,8 @@ console.warn('[PHP] Aviso...');         // Warning
 
 ```javascript
 // Sempre usar async/await em vez de callbacks
-const port = await findFreePort(FCGI_HOST);
-await waitForPort(FCGI_HOST, port, 10000);
+const port = await findFreePort(PHP_PROTOCOL_HOST);
+await waitForPort(PHP_PROTOCOL_HOST, port, 10000);
 await startPhp(resourcesPath, userDataPath);
 ```
 
@@ -508,14 +515,14 @@ await startPhp(resourcesPath, userDataPath);
 
 ### Ao modificar o servidor HTTP:
 
-- [ ] Verificar headers whitelist
+- [ ] Verificar headers blacklist
 - [ ] Verificar path traversal protection
 - [ ] Testar com arquivos estáticos
 - [ ] Testar com PHP
 
-### Ao modificar o gerenciador PHP:
+### Ao modificar o protocolo PHP:
 
-- [ ] Testar start/stop
+- [ ] Testar start/stop do PHP
 - [ ] Verificar cleanup de processos
 - [ ] Verificar timeout
 - [ ] Testar em Linux E Windows
@@ -547,7 +554,7 @@ await startPhp(resourcesPath, userDataPath);
 
 - CORS restrito para `https://localhost:PORT`
 - CSP não é necessário para desktop
-- Apenas headers da whitelist são passados ao PHP
+- Headers CGI usam blacklist (Apache/Nginx pattern)
 
 ### Path Traversal
 
@@ -582,6 +589,12 @@ await startPhp(resourcesPath, userDataPath);
 1. Verificar `php/php.ini`: `variables_order = "EGPCS"`
 2. Verificar `server/php-manager.js`: `getPhpEnvironment()` inclui MIPHANT_*
 3. Verificar `main.js`: `process.env.MIPHANT_*` definidos ANTES de `startPhp()`
+
+### Testes
+
+```bash
+/usr/bin/php8.5 tests/test-libs.php
+```
 
 ### Janela não abre
 

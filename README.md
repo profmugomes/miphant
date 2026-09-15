@@ -1,6 +1,6 @@
 # MiPhant
 
-**Version 5.0.0** — Desktop PHP applications with Electron.
+**Version 6.0.0** — Desktop PHP applications with Electron.
 
 MiPhant is a desktop application runner that lets you build and run PHP applications as native desktop apps on **Linux** and **Windows**. It combines Electron with a built-in HTTPS server that executes PHP through the FastCGI protocol, using platform-native PHP runtimes.
 
@@ -53,9 +53,10 @@ The `server/` directory contains modular Node.js server components:
 
 | Module | Description |
 |---|---|
-| `http-server.js` | HTTPS server with TLS, static file serving, FastCGI routing |
+| `http-server.js` | HTTPS server with TLS, static file serving, PHP protocol routing |
 | `php-manager.js` | PHP process lifecycle: start, stop, FPM pool config (Linux), CGI binding (Windows) |
-| `fastcgi.js` | FastCGI protocol implementation for PHP communication |
+| `php-protocol.js` | PHP protocol implementation for TCP communication with PHP-FPM/CGI |
+| `config.js` | Centralized configuration: HOST, ports, timeouts, limits |
 | `certificates.js` | Auto-generation of self-signed TLS certificates |
 | `logger.js` | Centralized logger with verbose mode controlled by `config.dev.tools` |
 | `utils.js` | Utility functions: free port finder, MIME types, port wait |
@@ -78,9 +79,9 @@ The `server/` directory contains modular Node.js server components:
 - **Arguments**: `-b 127.0.0.1:<port>`
 - **Advantages**: No external dependencies, works out of the box
 
-### FastCGI Protocol
+### PHP Protocol
 
-Both platforms use the same FastCGI protocol for communication. The Node.js server sends CGI parameters (request method, headers, query string, script filename, etc.) to the PHP process, which returns HTTP headers and body. The HTTPS server parses the PHP response and forwards it to the Electron renderer.
+Both platforms use the same TCP protocol for communication. The Node.js server sends CGI parameters (request method, headers, query string, script filename, etc.) to the PHP process, which returns HTTP headers and body. The HTTPS server parses the PHP response and forwards it to the Electron renderer.
 
 ## MiPhantLibs
 
@@ -203,7 +204,7 @@ The application is configured via `app/config.json`:
   "app": {
     "id": "miphant",
     "name": "MiPhant",
-    "version": "5.0.0",
+    "version": "6.0.0",
     "width": 800,
     "height": 600,
     "resizable": true,
@@ -217,7 +218,7 @@ The application is configured via `app/config.json`:
       "url": "https://www.profmugomes.com.br"
     },
     "homepage": "https://github.com/profmugomes/miphant/",
-    "license": "MIT",
+    "license": "SEE LICENSE IN LICENSE.md",
     "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
   },
   "server": {
@@ -382,9 +383,10 @@ miphant/
 ├── mifunctions.js          # IPC handlers (dialogs, tray, PDF, etc.)
 ├── milang.js               # Language detection and translation
 ├── server/                 # Node.js server modules
-│   ├── http-server.js      # HTTPS server with FastCGI routing
+│   ├── http-server.js      # HTTPS server with PHP protocol routing
 │   ├── php-manager.js      # PHP process management (FPM/CGI)
-│   ├── fastcgi.js          # FastCGI protocol implementation
+│   ├── php-protocol.js     # PHP protocol implementation (TCP)
+│   ├── config.js           # Centralized configuration
 │   ├── certificates.js     # Self-signed certificate generation
 │   ├── logger.js           # Centralized logger
 │   └── utils.js            # Utility functions
@@ -407,6 +409,9 @@ miphant/
 ├── staticphp/              # Static PHP build artifacts
 │   ├── linux/              # Linux: php-fpm + build metadata
 │   └── win32/              # Windows: php-cgi.exe + build metadata
+├── tests/                  # Test suite
+│   └── test-libs.php       # MiPhantLibs tests (101 tests)
+├── LICENSE.md              # PolyForm Perimeter 1.0.1
 └── electron-builder.yml    # Electron Builder configuration
 ```
 
@@ -478,47 +483,47 @@ bcmath, calendar, ctype, curl, dom, exif, fileinfo, filter, gd, iconv, mbstring,
 - GitHub: https://github.com/sponsors/profmugomes/
 - LivePix: https://livepix.gg/profmugomes
 
-## Licença
+## License
 
-Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. Todos os direitos reservados.
+Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All rights reserved.
 
-Este projeto está licenciado sob a [PolyForm Perimeter License 1.0.1](https://polyformproject.org/licenses/perimeter/1.0.1).
+This project is licensed under the [PolyForm Perimeter License 1.0.1](https://polyformproject.org/licenses/perimeter/1.0.1).
 
-### Resumo
+### Summary
 
-Você pode:
+You may:
 
-- ✔ Usar o software para qualquer propósito (pessoal, educacional, comercial).
-- ✔ Inspecionar e estudar o código-fonte.
-- ✔ Modificar o software e criar trabalhos derivados.
-- ✔ Distribuir cópias do software (com ou sem modificações).
+- ✔ Use the software for any purpose (personal, educational, commercial).
+- ✔ Inspect and study the source code.
+- ✔ Modify the software and create derivative works.
+- ✔ Distribute copies of the software (with or without modifications).
 
-Você não pode:
+You may not:
 
-- ✖ Fornecer um produto que compita com o software.
+- ✖ Provide a product that competes with the software.
 
-### O que é considerado competição?
+### What counts as competition?
 
-Um produto compete com o MiPhant se for oferecido como substituto da sua funcionalidade ou valor, independentemente de:
+A product competes with MiPhant if it is offered as a substitute for its functionality or value, regardless of:
 
-- Como seja projetado ou implantado.
-- Se for fornecido via interface (serviço, biblioteca ou plug-in).
-- Se for portado para outra plataforma ou linguagem de programação.
-- Se for fornecido gratuitamente.
+- How it is designed or deployed.
+- Whether it is provided via an interface (service, library, or plugin).
+- Whether it is ported to another platform or programming language.
+- Whether it is provided for free.
 
-### Exemplos de uso permitido
+### Permitted use examples
 
-- Usar o MiPhant para desenvolver aplicações desktop para si mesmo.
-- Usar o MiPhant em ambiente educacional ou de pesquisa.
-- Modificar o MiPhant para atender às suas necessidades.
-- Distribuir o MiPhant para terceiros (sem fins de competição).
+- Using MiPhant to build desktop applications for yourself.
+- Using MiPhant in educational or research environments.
+- Modifying MiPhant to suit your needs.
+- Distributing MiPhant to third parties (without competitive intent).
 
-### Exemplos de uso NÃO permitido
+### NOT permitted use examples
 
-- Criar um produto que funcione como alternativa ao MiPhant.
-- Oferecer um serviço que substitua a funcionalidade do MiPhant.
-- Vender uma versão modificada do MiPhant como produto concorrente.
+- Creating a product that functions as an alternative to MiPhant.
+- Offering a service that replaces MiPhant's functionality.
+- Selling a modified version of MiPhant as a competing product.
 
-Consulte os termos completos da licença em [LICENSE.md](LICENSE.md).
+See the full license terms in [LICENSE.md](LICENSE.md).
 
-Este resumo é fornecido apenas para conveniência.
+This summary is provided for convenience only.
