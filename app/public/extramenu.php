@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/libs/system/server.php';
-require_once __DIR__ . '/libs/langs/translate.php';
-require_once __DIR__ . '/libs/app/functions.php';
+require_once(__DIR__ . '/vendor/autoload.php');
 
 use MiPhantLibs\app\functions;
 

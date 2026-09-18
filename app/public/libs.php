@@ -1,14 +1,7 @@
 <?php
-require_once __DIR__ . '/libs/app/config.php';
-require_once __DIR__ . '/libs/app/functions.php';
-require_once __DIR__ . '/libs/app/path.php';
-require_once __DIR__ . '/libs/langs/translate.php';
-require_once __DIR__ . '/libs/system/server.php';
-require_once __DIR__ . '/libs/system/env.php';
-require_once __DIR__ . '/libs/system/platform.php';
+require_once(__DIR__ . '/vendor/autoload.php');
 
 use MiPhantLibs\app\config;
-use MiPhantLibs\app\functions;
 use MiPhantLibs\app\path;
 use MiPhantLibs\langs\translate;
 use MiPhantLibs\system\server;

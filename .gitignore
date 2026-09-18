@@ -150,5 +150,9 @@ dados/
 # pdf
 pdf/
 
+# composer
+app/public/vendor/
+app/public/composer.lock
+
 # agent
 AGENTS.md
