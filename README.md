@@ -14,7 +14,6 @@ MiPhant is a desktop application runner that lets you build and run PHP applicat
 - **System tray**, notifications, dialogs, multi-window support
 - **i18n** with automatic language detection and fallback chain
 - **Static PHP binary** compiled via [static-php-cli](https://github.com/crazywhalecc/static-php-cli)
-- **17+ demo pages** showcasing all features
 
 ## Architecture
 
@@ -317,35 +316,6 @@ When a language is detected (e.g. `pt-br`), the system tries:
   "Server has been started successfully.": "O servidor foi iniciado com sucesso."
 }
 ```
-
-## Demo Pages
-
-MiPhant includes 17+ demo pages showcasing all features:
-
-| Page | Description |
-|---|---|
-| `index.php` | Home page with navigation to all demos |
-| `about.php` | System information and license |
-| `env.php` | Environment variables display |
-| `args.php` | Command-line arguments |
-| `message.php` | Alert and confirm dialogs |
-| `notification.php` | System notifications |
-| `openfile.php` | Open file dialog |
-| `openfiles.php` | Multiple file selection |
-| `savefile.php` | Save file dialog |
-| `selectdirectory.php` | Directory selection |
-| `cookies.php` | Cookie management |
-| `session.php` | Session management |
-| `sqlite.php` | SQLite database operations |
-| `formget.php` | GET form handling |
-| `formpost.php` | POST form handling |
-| `translate.php` | i18n translation demo |
-| `timezone.php` | Timezone configuration |
-| `pdf.php` | PDF export |
-| `extramenu.php` | Custom menus per window |
-| `phpinfo.php` | PHP configuration info |
-| `libs.php` | MiPhantLibs API documentation |
-| `preload-doc.php` | Preload API documentation |
 
 ## System Requirements
 
