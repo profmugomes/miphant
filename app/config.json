@@ -21,7 +21,7 @@
 	},
 	"server": {
 		"perm": true,
-		"router": false
+		"router": true
 	},
 	"dev": {
 		"menu": true,
