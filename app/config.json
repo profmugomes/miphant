@@ -20,7 +20,6 @@
 		"copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
 	},
 	"server": {
-		"perm": true,
 		"router": true
 	},
 	"dev": {
