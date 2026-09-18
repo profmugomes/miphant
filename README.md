@@ -1,6 +1,6 @@
 # MiPhant
 
-**Version 6.0.0** — Desktop PHP applications with Electron.
+[![License](https://img.shields.io/badge/license-PolyForm%20Perimeter%201.0.1-5351FB)](LICENSE.md)
 
 MiPhant is a desktop application runner that lets you build and run PHP applications as native desktop apps on **Linux** and **Windows**. It combines Electron with a built-in HTTPS server that executes PHP through the FastCGI protocol, using platform-native PHP runtimes.
 
