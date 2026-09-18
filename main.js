@@ -219,7 +219,7 @@ async function miphantNewWindow(url, width, height, resizable, frame, hide, menu
             app.quit();
         });
 
-        createMenu(sNewWindow, menu || 'menu');
+        createMenu(sNewWindow, 'menu');
 
         sStartApp = false;
     }
@@ -228,9 +228,9 @@ async function miphantNewWindow(url, width, height, resizable, frame, hide, menu
     if (cleanUrl) {
         sNewWindow.loadURL(`${sServerName}${cleanUrl}`);
 
-        const menuFile = cleanUrl.replace('.php', '.json');
+        const menuFile = cleanUrl.replace(/(\.php|\/)$/, '.json');
         if (fs.existsSync(path.join(miphantPath, '/app/menus/', menuFile))) {
-            createMenu(sNewWindow, cleanUrl.replace('.php', ''));
+            createMenu(sNewWindow, menuFile.replace('.json', ''));
         }
     }
 
