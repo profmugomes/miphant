@@ -10,7 +10,7 @@ setcookie('info[msg]', $count, 0, '/', '', false, true);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cookies | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>Cookies</h1>

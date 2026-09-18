@@ -1,9 +1,7 @@
 <?php
 $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 $pdfDir = __DIR__ . '/pdf';
-if (!file_exists($pdfDir)) {
-    mkdir($pdfDir, 0755, true);
-}
+if (!file_exists($pdfDir)) mkdir($pdfDir, 0755, false);
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $lang; ?>">
@@ -11,7 +9,7 @@ if (!file_exists($pdfDir)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <style>
         @media print {
             .no-print { display: none !important; }

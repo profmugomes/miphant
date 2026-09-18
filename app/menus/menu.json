@@ -1,95 +1,95 @@
 {
     "Home": {
         "Home": {
-            "page": "index.php",
+            "page": "/index",
             "key": "CTRL+H"
         }
     },
     "System": {
         "Environment": {
-            "page": "env.php"
+            "page": "/env/"
         },
         "Arguments": {
-            "page": "args.php"
+            "page": "/args"
         },
         "PHPInfo": {
-            "page": "phpinfo.php",
+            "page": "/phpinfo",
             "key": "CTRL+P",
             "newwindow": true
         },
         "Timezone": {
-            "page": "timezone.php",
+            "page": "/timezone",
             "key": "CTRL+T"
         }
     },
     "Dialogs": {
         "Message": {
-            "page": "message.php"
+            "page": "/message"
         },
         "Notification": {
-            "page": "notification.php"
+            "page": "/notification"
         }
     },
     "Files": {
         "Open File": {
-            "page": "openfile.php",
+            "page": "/openfile",
             "key": "CTRL+O"
         },
         "Open Files": {
-            "page": "openfiles.php"
+            "page": "/openfiles"
         },
         "Save File": {
-            "page": "savefile.php",
+            "page": "/savefile",
             "key": "CTRL+S"
         },
         "Select Directory": {
-            "page": "selectdirectory.php"
+            "page": "/selectdirectory"
         },
         "Export PDF": {
-            "page": "pdf.php"
+            "page": "/pdf"
         }
     },
     "Data": {
         "SQLite3": {
-            "page": "sqlite.php",
+            "page": "/cadastro/listedit",
             "key": "CTRL+ALT+S"
         },
         "Cookies": {
-            "page": "cookies.php",
+            "page": "/cookies",
             "key": "CTRL+K"
         },
         "Session": {
-            "page": "session.php"
+            "page": "/session"
         }
     },
     "Forms": {
         "POST Form": {
-            "page": "formpost.php"
+            "page": "/formpost"
         },
         "GET Form": {
-            "page": "formget.php"
+            "page": "/formget"
         }
     },
     "i18n": {
         "Translate": {
-            "page": "translate.php"
+            "page": "/translate"
         },
         "Extra Menu": {
-            "page": "extramenu.php",
+            "page": "/extramenu",
             "newwindow": true
         }
     },
     "Docs": {
         "PHP Libraries": {
-            "page": "libs.php"
+            "page": "/libs"
         },
         "Preload API": {
-            "page": "preload-doc.php"
+            "page": "/preload-doc"
         }
     },
     "About": {
         "About MiPhant": {
-            "page": "about.php"
+            "page": "/about"
         },
         "Support MiPhant": {
             "url": "https://github.com/profmugomes/miphant",

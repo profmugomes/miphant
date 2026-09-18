@@ -5,7 +5,7 @@ if (!empty($_GET['filename'])) {
     $filename = filter_input(INPUT_GET, 'filename', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     if ($filename && file_exists($filename)) {
         echo '<!DOCTYPE html><html><head><title>File Content</title>';
-        echo '<link rel="stylesheet" href="style.css">';
+        echo '<link rel="stylesheet" href="/style.css">';
         echo '</head><body>';
         echo '<h1>' . htmlspecialchars(basename($filename)) . '</h1>';
         echo '<div class="card"><pre><code>' . htmlspecialchars(file_get_contents($filename)) . '</code></pre></div>';
@@ -21,7 +21,7 @@ if (!empty($_GET['filename'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Open File | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>Open File</h1>

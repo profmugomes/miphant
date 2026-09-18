@@ -8,7 +8,7 @@ date_default_timezone_set('America/Sao_Paulo');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timezone | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>Timezone</h1>

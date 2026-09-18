@@ -5,7 +5,7 @@ if (!empty($_GET['directory'])) {
     $directory = filter_input(INPUT_GET, 'directory', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     if ($directory) {
         echo '<!DOCTYPE html><html><head><title>Directory</title>';
-        echo '<link rel="stylesheet" href="style.css">';
+        echo '<link rel="stylesheet" href="/style.css">';
         echo '</head><body>';
         echo '<h1>Selected Directory</h1>';
         echo '<div class="card"><p><strong>' . htmlspecialchars($directory) . '</strong></p></div>';
@@ -21,7 +21,7 @@ if (!empty($_GET['directory'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Select Directory | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>Select Directory</h1>

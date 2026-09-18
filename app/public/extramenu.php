@@ -12,7 +12,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Extra Menu | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>Extra Menu</h1>
@@ -33,7 +33,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
         <pre><code>{
     "Menu Name": {
         "Item Label": {
-            "page": "target.php",
+            "page": "/target",
             "key": "Ctrl+O",
             "newwindow": true
         }
@@ -55,7 +55,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 
     <script>
         function openNew() {
-            <?php $func->noTag()->newWindow('extramenu.php', 900, 600, true, true, false, 'extramenu'); ?>
+            <?php $func->noTag()->newWindow('/extramenu', 900, 600, true, true, false, 'extramenu'); ?>
         }
     </script>
 </body>

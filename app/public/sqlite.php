@@ -2,6 +2,7 @@
 $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 
 $dbPath = __DIR__ . '/dados/example.sqlite';
+if (!file_exists($dbPath)) mkdir(dirname($dbPath), 0755, false);
 $db = new SQLite3($dbPath);
 $db->exec("CREATE TABLE IF NOT EXISTS logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +29,7 @@ $result = $db->query('SELECT * FROM logs ORDER BY id DESC LIMIT 20');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SQLite3 | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>SQLite3</h1>

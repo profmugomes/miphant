@@ -6,7 +6,7 @@ if (!empty($_GET['filename'])) {
     if ($filename) {
         file_put_contents($filename, 'Hello from MiPhant! ' . date('Y-m-d H:i:s'));
         echo '<!DOCTYPE html><html><head><title>Saved</title>';
-        echo '<link rel="stylesheet" href="style.css">';
+        echo '<link rel="stylesheet" href="/style.css">';
         echo '</head><body>';
         echo '<h1>File Saved</h1>';
         echo '<div class="card"><p class="text-success">File <strong>' . htmlspecialchars(basename($filename)) . '</strong> saved successfully!</p></div>';
@@ -22,7 +22,7 @@ if (!empty($_GET['filename'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Save File | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>Save File</h1>

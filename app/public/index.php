@@ -1,81 +1,114 @@
 <?php
-$lang = $_ENV['MIPHANT_LANG'] ?? 'en';
-?>
-<!DOCTYPE html>
-<html lang="<?php echo $lang; ?>">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MiPhant</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <h1>MiPhant</h1>
-    <p class="text-muted mb-3">Run and develop PHP applications for desktop</p>
 
-    <div class="grid grid-4 mb-3" id="versions">
-        <div class="stat">
-            <div class="stat-value" id="v-miphant">...</div>
-            <div class="stat-label">MiPhant</div>
-        </div>
-        <div class="stat">
-            <div class="stat-value" id="v-electron">...</div>
-            <div class="stat-label">Electron</div>
-        </div>
-        <div class="stat">
-            <div class="stat-value" id="v-node">...</div>
-            <div class="stat-label">Node.js</div>
-        </div>
-        <div class="stat">
-            <div class="stat-value" id="v-chromium">...</div>
-            <div class="stat-label">Chromium</div>
-        </div>
-    </div>
+use MiPhantLibs\app\router;
+use MiPhantLibs\security\items;
+use MiPhantLibs\system\server;
 
-    <div class="card">
-        <h2>Examples</h2>
-        <ul>
-            <?php
-            $files = scandir(__DIR__);
-            foreach ($files as $file) {
-                if ($file === '.' || $file === '..' || $file === 'index.php' || $file === 'style.css' || is_dir(__DIR__ . '/' . $file)) {
-                    continue;
-                }
-                if (pathinfo($file, PATHINFO_EXTENSION) === 'php' && basename($file) !== 'index.php') {
-                    $name = ucfirst(str_replace('.php', '', $file));
-                    printf('<li><a href="%s">%s</a></li>', $file, $name);
-                }
-            }
-            ?>
-        </ul>
-    </div>
+require_once(__DIR__ . '/vendor/autoload.php');
 
-    <div class="card text-muted">
-        <p>PHP <?php echo phpversion(); ?> | <?php echo $_ENV['MIPHANT_PLATFORM'] ?? ''; ?> | <?php echo $_ENV['MIPHANT_USERNAME'] ?? ''; ?></p>
-    </div>
+$server = new server();
+$item = new items();
+$rt = new router();
 
-    <script>
-        async function loadVersions() {
-            const fields = {
-                'v-miphant': 'miphant',
-                'v-electron': 'electron',
-                'v-node': 'node',
-                'v-chromium': 'chromium'
-            };
+$uri = parse_url($server->uri(), PHP_URL_PATH);
 
-            for (const [id, type] of Object.entries(fields)) {
-                const el = document.getElementById(id);
-                if (el) el.textContent = await miphant.version(type);
-            }
-        }
+$rt->get('/', function() {
+    require_once(__DIR__ . '/home.php');
+});
 
-        loadVersions();
+$rt->get('/about', function() {
+    require_once(__DIR__ . '/about.php');
+});
 
-        miphant.tray('MiPhant', 'MiPhant', '', JSON.stringify({
-            "Home": { page: "index.php" },
-            "Message": { script: "miphant.alert('MiPhant', 'Hello from tray!', 'info', 'OK');" },
-            "Close": { script: "miphant.close();" }
-        }));
-    </script>
-</body>
-</html>
+$rt->get('/args', function() {
+    require_once(__DIR__ . '/args.php');
+});
+
+$rt->get('/cookies', function() {
+    require_once(__DIR__ . '/cookies.php');
+});
+
+$rt->get('/extramenu', function() {
+    require_once(__DIR__ . '/extramenu.php');
+});
+
+$rt->get('/formget', function() {
+    require_once(__DIR__ . '/formget.php');
+});
+
+$rt->get('/formpost', function() {
+    require_once(__DIR__ . '/formpost.php');
+});
+
+$rt->get('/libs', function() {
+    require_once(__DIR__ . '/libs.php');
+});
+
+$rt->get('/message', function() {
+    require_once(__DIR__ . '/message.php');
+});
+
+$rt->get('/notification', function() {
+    require_once(__DIR__ . '/notification.php');
+});
+
+$rt->get('/env', function() {
+    require_once(__DIR__ . '/env.php');
+});
+
+$rt->get('/openfile', function() {
+    require_once(__DIR__ . '/openfile.php');
+});
+
+$rt->get('/openfiles', function() {
+    require_once(__DIR__ . '/openfiles.php');
+});
+
+$rt->get('/phpinfo', function() {
+    require_once(__DIR__ . '/phpinfo.php');
+});
+
+$rt->get('/preload-doc', function() {
+    require_once(__DIR__ . '/preload-doc.php');
+});
+
+$rt->get('/savefile', function() {
+    require_once(__DIR__ . '/savefile.php');
+});
+
+$rt->get('/selectdirectory', function() {
+    require_once(__DIR__ . '/selectdirectory.php');
+});
+
+$rt->get('/pdf', function() {
+    require_once(__DIR__ . '/pdf.php');
+});
+
+$rt->get('/session', function() {
+    require_once(__DIR__ . '/session.php');
+});
+
+$rt->get('/cadastro/listedit', function() {
+    require_once(__DIR__ . '/sqlite.php');
+});
+
+$rt->get('/timezone', function() {
+    require_once(__DIR__ . '/timezone.php');
+});
+
+$rt->get('/translate', function() {
+    require_once(__DIR__ . '/translate.php');
+});
+
+if ($rt->noPHP()) {
+    return false;
+}
+
+
+// if (substr($uri, -1) == '/') {
+//     if ($uri == 'home')
+// } elseif (substr($uri, -4) == '.php') {
+//     require_once(__DIR__ . $item->clean($uri));
+// } else {
+//     return false;
+// }

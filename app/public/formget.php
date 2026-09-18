@@ -7,7 +7,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Form GET | MiPhant</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <h1>Form GET</h1>
@@ -21,7 +21,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
     <?php endif; ?>
 
     <div class="card">
-        <form method="get" action="formget.php">
+        <form method="get" action="/formget">
             <div class="form-group">
                 <label for="name">Your Name</label>
                 <input type="text" id="name" name="name" placeholder="Type your name..." required>
