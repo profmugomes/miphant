@@ -1,7 +1,7 @@
 {
     "Home": {
         "Home": {
-            "page": "/index",
+            "page": "/home",
             "key": "CTRL+H"
         }
     },
@@ -10,7 +10,7 @@
             "page": "/env/"
         },
         "Arguments": {
-            "page": "/args"
+            "page": "/args/2sasd"
         },
         "PHPInfo": {
             "page": "/phpinfo",
@@ -52,6 +52,10 @@
     "Data": {
         "SQLite3": {
             "page": "/cadastro/listedit",
+            "key": "CTRL+ALT+S"
+        },
+        "SQLite3 com ID": {
+            "page": "/cadastro/listedit/1",
             "key": "CTRL+ALT+S"
         },
         "Cookies": {
