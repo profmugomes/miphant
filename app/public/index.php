@@ -1,18 +1,12 @@
 <?php
 
 use MiPhantLibs\app\router;
-use MiPhantLibs\security\items;
-use MiPhantLibs\system\server;
 
 require_once(__DIR__ . '/vendor/autoload.php');
 
-$server = new server();
-$item = new items();
 $rt = new router();
 
-$uri = parse_url($server->uri(), PHP_URL_PATH);
-
-$rt->get('/', function() {
+$rt->get(['/', '/home'], function() {
     require_once(__DIR__ . '/home.php');
 });
 
@@ -92,6 +86,10 @@ $rt->get('/cadastro/listedit', function() {
     require_once(__DIR__ . '/sqlite.php');
 });
 
+$rt->get('/cadastro/listedit/{id}/', function(int $id) {
+    require_once(__DIR__ . '/sqlite.php');
+});
+
 $rt->get('/timezone', function() {
     require_once(__DIR__ . '/timezone.php');
 });
@@ -103,12 +101,3 @@ $rt->get('/translate', function() {
 if ($rt->noPHP()) {
     return false;
 }
-
-
-// if (substr($uri, -1) == '/') {
-//     if ($uri == 'home')
-// } elseif (substr($uri, -4) == '.php') {
-//     require_once(__DIR__ . $item->clean($uri));
-// } else {
-//     return false;
-// }

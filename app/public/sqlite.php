@@ -20,33 +20,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
-
-$result = $db->query('SELECT * FROM logs ORDER BY id DESC LIMIT 20');
+if (isset($id)) {
+    $result = $db->query('SELECT * FROM logs WHERE id=' . $id);
+} else {
+    $result = $db->query('SELECT * FROM logs ORDER BY id DESC LIMIT 20');
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $lang; ?>">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SQLite3 | MiPhant</title>
     <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
     <h1>SQLite3</h1>
     <p class="text-muted mb-3">SQLite database example</p>
 
-
-
-    <div class="card">
-        <h2>Add Record</h2>
-        <form method="post">
-            <div class="form-group">
-                <label for="message">Message</label>
-                <input type="text" id="message" name="message" placeholder="Type a message..." required>
-            </div>
-            <button type="submit" class="btn btn-success">Insert</button>
-        </form>
-    </div>
+    <?php if (!isset($id)) : ?>
+        <div class="card">
+            <h2>Add Record</h2>
+            <form method="post">
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <input type="text" id="message" name="message" placeholder="Type a message..." required>
+                </div>
+                <button type="submit" class="btn btn-success">Insert</button>
+            </form>
+        </div>
+    <?php endif; ?>
 
     <div class="card">
         <h2>Records</h2>
@@ -57,11 +62,11 @@ $result = $db->query('SELECT * FROM logs ORDER BY id DESC LIMIT 20');
                 <th>Created</th>
             </tr>
             <?php while ($row = $result->fetchArray(SQLITE3_ASSOC)): ?>
-            <tr>
-                <td><?php echo $row['id']; ?></td>
-                <td><?php echo htmlspecialchars($row['message']); ?></td>
-                <td><?php echo $row['created_at']; ?></td>
-            </tr>
+                <tr>
+                    <td><?php echo $row['id']; ?></td>
+                    <td><?php echo htmlspecialchars($row['message']); ?></td>
+                    <td><?php echo $row['created_at']; ?></td>
+                </tr>
             <?php endwhile; ?>
         </table>
     </div>
@@ -70,4 +75,5 @@ $result = $db->query('SELECT * FROM logs ORDER BY id DESC LIMIT 20');
 
     <a href="index.php" class="btn btn-outline">&larr; Back</a>
 </body>
+
 </html>
