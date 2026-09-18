@@ -242,7 +242,7 @@ MiPhant includes a dark theme design system in `app/style.css` with:
 To use in your pages:
 
 ```html
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/style.css">
 ```
 
 ### Available classes

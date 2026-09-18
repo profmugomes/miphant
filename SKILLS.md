@@ -512,7 +512,7 @@ MiPhant inclui um design system dark em `app/style.css`.
 ### Usando
 
 ```html
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/style.css">
 ```
 
 ### Componentes
@@ -662,7 +662,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 ### Criando uma nova página
 
 - [ ] Criar arquivo PHP em `app/minha-pagina.php`
-- [ ] Adicionar `<link rel="stylesheet" href="style.css">`
+- [ ] Adicionar `<link rel="stylesheet" href="/style.css">`
 - [ ] Definir `<html lang="<?php echo $lang; ?>">`
 - [ ] Adicionar link de volta: `<a href="index.php" class="btn btn-outline">← Back</a>`
 - [ ] Adicionar ao menu em `app/menus/menu.json`
