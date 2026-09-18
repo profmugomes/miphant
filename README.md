@@ -22,20 +22,20 @@ MiPhant is a desktop application runner that lets you build and run PHP applicat
 ┌──────────────────────────────────────────────────────────┐
 │                       Electron                           │
 │  ┌───────────────┐    ┌──────────────────────────────┐   │
-│  │  BrowserWindow │    │        Main Process           │   │
-│  │  (Renderer)    │◄──►│         (Node.js)             │   │
-│  │  preload.js    │IPC │                               │   │
+│  │  BrowserWindow│    │        Main Process          │   │
+│  │  (Renderer)   │◄──►│         (Node.js)            │   │
+│  │  preload.js   │IPC │                              │   │
 │  └───────────────┘    │  ┌────────────────────────┐  │   │
-│                        │  │    HTTPS Server         │  │   │
-│                        │  │    (Node.js + TLS)      │  │   │
-│                        │  └───────────┬────────────┘  │   │
-│                        │              │ FastCGI        │   │
-│                        │  ┌───────────▼────────────┐  │   │
-│                        │  │ Linux: php-fpm          │  │   │
-│                        │  │ Windows: php-cgi.exe    │  │   │
-│                        │  │ (static binary)         │  │   │
-│                        │  └────────────────────────┘  │   │
-│                        └──────────────────────────────┘   │
+│                       │  │    HTTPS Server        │  │   │
+│                       │  │    (Node.js + TLS)     │  │   │
+│                       │  └───────────┬────────────┘  │   │
+│                       │              │ FastCGI       │   │
+│                       │  ┌───────────▼────────────┐  │   │
+│                       │  │ Linux: php-fpm         │  │   │
+│                       │  │ Windows: php-cgi.exe   │  │   │
+│                       │  │ (static binary)        │  │   │
+│                       │  └────────────────────────┘  │   │
+│                       └──────────────────────────────┘   │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -111,33 +111,6 @@ PHP library included in `app/libs/` for building desktop applications. No Compos
 | `env` | Access MiPhant environment variables (`MIPHANT_LANG`, `MIPHANT_USERNAME`, etc.) |
 | `server` | Server helpers: domain, URI, document root |
 | `platform` | OS detection: `osLinux()`, `osWindows()` |
-
-### Usage Example
-
-```php
-require_once __DIR__ . '/libs/app/config.php';
-require_once __DIR__ . '/libs/app/functions.php';
-require_once __DIR__ . '/libs/langs/translate.php';
-require_once __DIR__ . '/libs/system/server.php';
-require_once __DIR__ . '/libs/system/env.php';
-
-use MiPhantLibs\app\config;
-use MiPhantLibs\app\functions;
-use MiPhantLibs\langs\translate;
-
-$cfg = new config();
-$func = new functions();
-$translate = new translate();
-
-// Read config
-$width = $cfg->get('app', 'width');
-
-// Show translated alert
-$func->alert('Info', $translate->get('Server has been started successfully.'), 'info');
-
-// Open new window
-$func->noTag()->newWindow('page.php', 800, 600);
-```
 
 ## MiPhant API
 
@@ -222,7 +195,7 @@ The application is configured via `app/config.json`:
     "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
   },
   "server": {
-    "perm": false,
+    "perm": true,
     "router": false
   },
   "dev": {
@@ -373,90 +346,6 @@ MiPhant includes 17+ demo pages showcasing all features:
 | `phpinfo.php` | PHP configuration info |
 | `libs.php` | MiPhantLibs API documentation |
 | `preload-doc.php` | Preload API documentation |
-
-## Project Structure
-
-```
-miphant/
-├── main.js                 # Electron main process
-├── preload.js              # Preload bridge (miphant API)
-├── mifunctions.js          # IPC handlers (dialogs, tray, PDF, etc.)
-├── milang.js               # Language detection and translation
-├── server/                 # Node.js server modules
-│   ├── http-server.js      # HTTPS server with PHP protocol routing
-│   ├── php-manager.js      # PHP process management (FPM/CGI)
-│   ├── php-protocol.js     # PHP protocol implementation (TCP)
-│   ├── config.js           # Centralized configuration
-│   ├── certificates.js     # Self-signed certificate generation
-│   ├── logger.js           # Centralized logger
-│   └── utils.js            # Utility functions
-├── app/                    # PHP application files
-│   ├── config.json         # Application configuration
-│   ├── style.css           # Dark theme design system
-│   ├── index.php           # Default start page
-│   ├── langs/              # Translation files (pt.json, en.json)
-│   ├── menus/              # Menu definitions (menu.json)
-│   ├── libs/               # MiPhantLibs PHP library
-│   │   ├── app/            # App classes (config, functions, file, path, about, router)
-│   │   ├── langs/          # Translation class
-│   │   ├── system/         # System classes (env, server, platform)
-│   │   └── security/       # Security utilities
-│   └── *.php               # Demo pages
-├── php/                    # PHP binaries and configuration
-│   ├── php.ini             # PHP configuration file
-│   ├── php-fpm             # PHP-FPM binary (Linux)
-│   └── php-cgi.exe         # PHP-CGI binary (Windows)
-├── staticphp/              # Static PHP build artifacts
-│   ├── linux/              # Linux: php-fpm + build metadata
-│   └── win32/              # Windows: php-cgi.exe + build metadata
-├── tests/                  # Test suite
-│   └── test-libs.php       # MiPhantLibs tests (101 tests)
-├── LICENSE.md              # PolyForm Perimeter 1.0.1
-└── electron-builder.yml    # Electron Builder configuration
-```
-
-## Building
-
-### Prerequisites
-
-- Node.js 18+
-- npm
-
-### Install dependencies
-
-```bash
-npm install
-```
-
-### Run in development
-
-```bash
-npm start
-```
-
-### Configure Chrome sandbox (Linux)
-
-```bash
-./config-dev.sh
-```
-
-### Build for Linux
-
-```bash
-npm run dist-linux
-```
-
-### Build for Windows
-
-```bash
-npm run dist-win
-```
-
-### Build for both platforms
-
-```bash
-./compile.sh
-```
 
 ## System Requirements
 
