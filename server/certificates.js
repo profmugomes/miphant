@@ -11,12 +11,8 @@ const path = require('path');
 const { exists } = require('./utils');
 const { log: loggerLog } = require('./logger');
 
-// ============================================================
 // ASN.1 / DER
-//
 // Implementacao minima necessaria para criar X.509.
-// ============================================================
-
 function derLength(length) {
     if (length < 128) {
         return Buffer.from([length]);
@@ -148,10 +144,7 @@ function derContext(tagNumber, content, constructed = true) {
     return der(tag, content);
 }
 
-// ============================================================
 // X.509
-// ============================================================
-
 function createName(commonName) {
     const oidCommonName = derOID('2.5.4.3');
     const attribute = derSequence(oidCommonName, derUTF8String(commonName));
@@ -199,10 +192,7 @@ function createExtensions() {
     return derSequence(subjectAlternativeName, basicConstraints);
 }
 
-// ============================================================
-// CRIAR CERTIFICADO AUTOASSINADO
-// ============================================================
-
+// Criar Certificado Auto Assinado
 function createSelfSignedCertificate(certificateDirectory) {
     const keyFile = path.join(certificateDirectory, 'server.key');
     const certFile = path.join(certificateDirectory, 'server.crt');
@@ -283,10 +273,7 @@ function createSelfSignedCertificate(certificateDirectory) {
     return { key: keyFile, cert: certFile };
 }
 
-// ============================================================
-// VALIDAR CERTIFICADO
-// ============================================================
-
+// Validar Certificado
 function validateCertificate(certFile) {
     try {
         const certificate = new crypto.X509Certificate(
@@ -305,10 +292,6 @@ function validateCertificate(certFile) {
         return false;
     }
 }
-
-// ============================================================
-// EXPORTS
-// ============================================================
 
 module.exports = {
     createSelfSignedCertificate,

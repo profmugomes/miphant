@@ -4,24 +4,11 @@
 
 'use strict';
 
-/**
- * Configuracao centralizada do MiPhant Server
- */
-
 const SERVER_CONFIG = {
-    // Host para todas as conexoes locais
     HOST: '127.0.0.1',
-
-    // Porta padrao do servidor HTTPS
     DEFAULT_HTTPS_PORT: 8443,
-
-    // Tamanho maximo do body (50MB)
     MAX_BODY_SIZE: 50 * 1024 * 1024,
-
-    // Timeout para operacoes PHP (30s)
     PHP_TIMEOUT: 30000,
-
-    // Tamanho maximo da resposta PHP (50MB)
     PHP_MAX_RESPONSE_SIZE: 50 * 1024 * 1024
 };
 
