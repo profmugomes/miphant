@@ -24,7 +24,7 @@
 		"router": false
 	},
 	"dev": {
-		"menu": false,
+		"menu": true,
 		"tools": false
 	}
 }
