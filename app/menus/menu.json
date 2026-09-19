@@ -79,7 +79,7 @@
             "page": "/translate"
         },
         "Extra Menu": {
-            "page": "/extramenu",
+            "page": "/extramenu/",
             "newwindow": true
         }
     },
