@@ -83,10 +83,7 @@ const createWindow = () => {
 
 let shuttingDown = false;
 
-// ============================================================
-// CAMINHOS
-// ============================================================
-
+// Caminhos
 function getPublicRoot() {
     return path.join(miphantPath, 'app', 'public');
 }
