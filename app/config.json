@@ -2,7 +2,7 @@
 	"app": {
 		"id": "miphant",
 		"name": "MiPhant",
-		"version": "6.0.0",
+		"version": "6.0.1",
 		"width": 800,
 		"height": 600,
 		"resizable": true,
