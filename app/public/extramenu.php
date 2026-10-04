@@ -55,7 +55,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 
     <script>
         function openNew() {
-            <?php $func->noTag()->newWindow('/extramenu', 900, 600, true, true, false, 'extramenu'); ?>
+            <?php $func->noTag()->newWindow('/extramenu/', 900, 600, true, true, false, 'extramenu'); ?>
         }
     </script>
 </body>
