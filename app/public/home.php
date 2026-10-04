@@ -35,18 +35,28 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
     <div class="card">
         <h2>Examples</h2>
         <ul>
-            <?php
-            $files = scandir(__DIR__);
-            foreach ($files as $file) {
-                if ($file === '.' || $file === '..' || $file === 'index.php' || $file === 'style.css' || is_dir(__DIR__ . '/' . $file)) {
-                    continue;
-                }
-                if (pathinfo($file, PATHINFO_EXTENSION) === 'php' && basename($file) !== 'index.php') {
-                    $name = ucfirst(str_replace('.php', '', $file));
-                    printf('<li><a href="%s">%s</a></li>', $file, $name);
-                }
-            }
-            ?>
+            <li><a href="/about" target="_blank" rel="noopener">About</a></li>
+            <li><a href="/args" target="_blank" rel="noopener">Args</a></li>
+            <li><a href="/cookies" target="_blank" rel="noopener">Cookies</a></li>
+            <li><a href="/extramenu" target="_blank" rel="noopener">Extra Menu</a></li>
+            <li><a href="/formget" target="_blank" rel="noopener">Form GET</a></li>
+            <li><a href="/formpost" target="_blank" rel="noopener">Form POST</a></li>
+            <li><a href="/libs" target="_blank" rel="noopener">Libs</a></li>
+            <li><a href="/message" target="_blank" rel="noopener">Message</a></li>
+            <li><a href="/notification" target="_blank" rel="noopener">Notification</a></li>
+            <li><a href="/env" target="_blank" rel="noopener">Env</a></li>
+            <li><a href="/openfile" target="_blank" rel="noopener">Open File</a></li>
+            <li><a href="/openfiles" target="_blank" rel="noopener">Open Files</a></li>
+            <li><a href="/phpinfo" target="_blank" rel="noopener">PHP Info</a></li>
+            <li><a href="/preload-doc" target="_blank" rel="noopener">Preload Doc</a></li>
+            <li><a href="/savefile" target="_blank" rel="noopener">Save File</a></li>
+            <li><a href="/selectdirectory" target="_blank" rel="noopener">Select Directory</a></li>
+            <li><a href="/pdf" target="_blank" rel="noopener">PDF</a></li>
+            <li><a href="/session" target="_blank" rel="noopener">Session</a></li>
+            <li><a href="/cadastro/listedit" target="_blank" rel="noopener">List Edit</a></li>
+            <li><a href="/cadastro/listedit/1/" target="_blank" rel="noopener">List Edit with ID</a></li>
+            <li><a href="/timezone" target="_blank" rel="noopener">Timezone</a></li>
+            <li><a href="/translate" target="_blank" rel="noopener">Traduzir</a></li>
         </ul>
     </div>
 
