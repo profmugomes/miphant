@@ -31,7 +31,7 @@ if (!empty($_GET['filename'])) {
         <button class="btn btn-primary" onclick="openFile()">Select File</button>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 
     <script>
         async function openFile() {

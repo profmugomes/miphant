@@ -32,7 +32,7 @@ if (!empty($_GET['filename'])) {
         <button class="btn btn-success" onclick="saveFile()">Select Location &amp; Save</button>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 
     <script>
         async function saveFile() {

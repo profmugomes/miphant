@@ -31,7 +31,7 @@ if (!empty($_GET['directory'])) {
         <button class="btn btn-primary" onclick="selectDir()">Select Directory</button>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 
     <script>
         async function selectDir() {

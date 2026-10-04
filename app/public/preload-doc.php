@@ -374,6 +374,6 @@ if (exists) { /* file found */ }</code></pre>
         <pre><code>miphant.close();</code></pre>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 </body>
 </html>

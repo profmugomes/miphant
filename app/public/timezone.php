@@ -22,6 +22,6 @@ date_default_timezone_set('America/Sao_Paulo');
         <p class="text-muted text-center mt-2">Timezone: <?php echo date('T'); ?> (UTC<?php echo date('P'); ?>)</p>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 </body>
 </html>

@@ -24,7 +24,7 @@ setcookie('info[msg]', $count, 0, '/', '', false, true);
         <button class="btn btn-primary" onclick="location.reload()">Increment</button>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 
 
 </body>

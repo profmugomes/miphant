@@ -247,6 +247,6 @@ $func->noTag()->newWindow('page.php', 800, 600);
 $func->redirect('page.php', ['id' => 42, 'name' => 'test']);</code></pre>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 </body>
 </html>

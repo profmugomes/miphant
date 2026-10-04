@@ -31,6 +31,6 @@ Windows: miphant.exe arg1 arg2 arg3</code></pre>
         ?>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 </body>
 </html>

@@ -51,8 +51,6 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
         </table>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
-
     <script>
         function openNew() {
             <?php $func->noTag()->newWindow('/extramenu/', 900, 600, true, true, false, 'extramenu'); ?>

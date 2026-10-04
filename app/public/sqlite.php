@@ -73,7 +73,7 @@ if (isset($id)) {
 
     <?php $db->close(); ?>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 </body>
 
 </html>

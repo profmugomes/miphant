@@ -24,7 +24,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
         <p class="text-success">Notification sent!</p>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 
     <script>
         function sendNotification() {

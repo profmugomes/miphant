@@ -44,6 +44,6 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
         </table>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 </body>
 </html>

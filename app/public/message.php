@@ -30,7 +30,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
         <p id="result-text"></p>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 
     <script>
         function showAlert() {

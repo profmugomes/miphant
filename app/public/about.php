@@ -45,7 +45,7 @@ $license = file_get_contents(__DIR__ . '/../../LICENSE.md');
         <?php echo $about->setLicense('PolyForm Perimeter License', $license); ?>
     </div>
 
-    <a href="index.php" class="btn btn-outline">&larr; Back</a>
+    <a href="/" class="btn btn-outline">&larr; Back</a>
 
     <script>
         async function loadVersion() {
