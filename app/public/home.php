@@ -38,7 +38,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
             <li><a href="/about" target="_blank" rel="noopener">About</a></li>
             <li><a href="/args" target="_blank" rel="noopener">Args</a></li>
             <li><a href="/cookies" target="_blank" rel="noopener">Cookies</a></li>
-            <li><a href="/extramenu" target="_blank" rel="noopener">Extra Menu</a></li>
+            <li><a href="/extramenu/" target="_blank" rel="noopener">Extra Menu</a></li>
             <li><a href="/formget" target="_blank" rel="noopener">Form GET</a></li>
             <li><a href="/formpost" target="_blank" rel="noopener">Form POST</a></li>
             <li><a href="/libs" target="_blank" rel="noopener">Libs</a></li>
@@ -56,7 +56,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
             <li><a href="/cadastro/listedit" target="_blank" rel="noopener">List Edit</a></li>
             <li><a href="/cadastro/listedit/1/" target="_blank" rel="noopener">List Edit with ID</a></li>
             <li><a href="/timezone" target="_blank" rel="noopener">Timezone</a></li>
-            <li><a href="/translate" target="_blank" rel="noopener">Traduzir</a></li>
+            <li><a href="/translate" target="_blank" rel="noopener">Translate</a></li>
         </ul>
     </div>
 
