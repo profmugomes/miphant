@@ -148,7 +148,7 @@ package-lock.json
 dados/
 
 # pdf
-pdf/
+pdfdoc/
 
 # composer
 app/public/vendor/
