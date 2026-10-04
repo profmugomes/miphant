@@ -1,6 +1,6 @@
 <?php
 $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
-$pdfDir = __DIR__ . '/pdf';
+$pdfDir = __DIR__ . '/pdfdoc';
 if (!file_exists($pdfDir)) mkdir($pdfDir, 0755, false);
 ?>
 <!DOCTYPE html>
@@ -63,7 +63,7 @@ if (!file_exists($pdfDir)) mkdir($pdfDir, 0755, false);
                 await new Promise(r => setTimeout(r, 200));
             }
 
-            miphant.newWindow('pdf/example.pdf');
+            miphant.newWindow('pdfdoc/example.pdf');
         }
     </script>
 </body>
