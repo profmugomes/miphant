@@ -5,7 +5,13 @@
 'use strict';
 
 const net = require('net');
-const { PHP_TIMEOUT, PHP_MAX_RESPONSE_SIZE } = require('./config');
+const {
+    PHP_TIMEOUT,
+    PHP_STREAM_IDLE_TIMEOUT,
+    PHP_STREAM_MAX_DURATION,
+    PHP_MAX_RESPONSE_SIZE,
+    PHP_MAX_STDERR_SIZE
+} = require('./config');
 
 // ============================================================
 // PHP PROTOCOL CONSTANTS
@@ -89,26 +95,81 @@ function encodePhpParams(params) {
 //   - PHP_PROTOCOL_KEEP_CONN = 0 (bug fix)
 //   - timeout no socket (bug fix)
 //   - PHP_MAX_RESPONSE_SIZE (bug fix)
+//
+// Streaming (opcional):
+//   - onStdout: callback chamado a cada registro FCGI_STDOUT.
+//     Quando presente, os chunks NAO sao acumulados em memoria
+//     (stdout resolvido = Buffer vazio) e o timeout passa a ser
+//     inatividade (PHP_STREAM_IDLE_TIMEOUT) + teto absoluto
+//     (PHP_STREAM_MAX_DURATION).
+//   - signal: AbortSignal para cancelar quando o cliente
+//     desconectar no meio da resposta.
 // ============================================================
 
-function executePhpProtocol({ host, port, params, body }) {
+function executePhpProtocol({ host, port, params, body, onStdout, onBackpressure, signal }) {
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
         const requestId = nextRequestId++;
 
+        // FastCGI usa requestId de 16 bits (0..65535)
+        if (nextRequestId > 65535) {
+            nextRequestId = 1;
+        }
+
+        const streaming = typeof onStdout === 'function';
         const stdoutChunks = [];
         const stderrChunks = [];
 
         let incoming = Buffer.alloc(0);
         let completed = false;
         let totalResponseSize = 0;
+        let stderrSize = 0;
 
+        // Timeout total (modo legado) ou inatividade + teto (modo stream)
         const timer = setTimeout(() => {
-            fail(new Error('PHP protocol timeout'));
-        }, PHP_TIMEOUT);
+            fail(new Error(streaming
+                ? 'PHP stream max duration exceeded'
+                : 'PHP protocol timeout'));
+        }, streaming ? PHP_STREAM_MAX_DURATION : PHP_TIMEOUT);
+
+        let idleTimer = null;
+
+        function resetIdleTimer() {
+            if (!streaming) return;
+
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                fail(new Error('PHP stream idle timeout'));
+            }, PHP_STREAM_IDLE_TIMEOUT);
+        }
+
+        if (streaming) {
+            resetIdleTimer();
+        }
+
+        // Abort do cliente (fetch cancelado / janela fechada)
+        function onAbort() {
+            const error = new Error('PHP request aborted');
+            error.code = 'ABORTED';
+            fail(error);
+        }
+
+        if (signal) {
+            if (signal.aborted) {
+                onAbort();
+                return;
+            }
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
 
         function cleanup() {
             clearTimeout(timer);
+            clearTimeout(idleTimer);
+
+            if (signal) {
+                signal.removeEventListener('abort', onAbort);
+            }
+
             socket.removeAllListeners();
 
             if (!socket.destroyed) {
@@ -127,7 +188,7 @@ function executePhpProtocol({ host, port, params, body }) {
             if (completed) return;
             completed = true;
 
-            const stdout = Buffer.concat(stdoutChunks);
+            const stdout = streaming ? Buffer.alloc(0) : Buffer.concat(stdoutChunks);
             const stderr = Buffer.concat(stderrChunks);
 
             cleanup();
@@ -162,11 +223,41 @@ function executePhpProtocol({ host, port, params, body }) {
                             return;
                         }
 
-                        stdoutChunks.push(Buffer.from(content));
+                        if (streaming) {
+                            // Excecao no callback NAO pode escapar para o
+                            // event loop (viraria uncaughtException sem
+                            // fail() — requisicao pendurada ate o timeout)
+                            try {
+                                const wantMore = onStdout(Buffer.from(content));
+
+                                // Backpressure: consumidor lotado => pausa
+                                if (wantMore === false && !socket.paused) {
+                                    socket.pause();
+                                    if (typeof onBackpressure === 'function') {
+                                        onBackpressure(() => {
+                                            if (!completed && !socket.destroyed) {
+                                                socket.resume();
+                                            }
+                                        });
+                                    }
+                                }
+                            } catch (error) {
+                                fail(error);
+                                return;
+                            }
+                        } else {
+                            stdoutChunks.push(Buffer.from(content));
+                        }
                     }
                 } else if (type === PHP_PROTOCOL_STDERR) {
-                    if (content.length) {
-                        stderrChunks.push(Buffer.from(content));
+                    // Limite defensivo: warnings acumulados num stream
+                    // de ate 310s nao devem crescer sem teto
+                    if (content.length && stderrSize < PHP_MAX_STDERR_SIZE) {
+                        const slice = content.subarray(
+                            0, PHP_MAX_STDERR_SIZE - stderrSize
+                        );
+                        stderrChunks.push(Buffer.from(slice));
+                        stderrSize += slice.length;
                     }
                 } else if (type === PHP_PROTOCOL_END_REQUEST) {
                     complete();
@@ -176,6 +267,7 @@ function executePhpProtocol({ host, port, params, body }) {
         }
 
         socket.on('data', chunk => {
+            resetIdleTimer();
             incoming = Buffer.concat([incoming, chunk]);
             parseRecords();
         });
@@ -227,36 +319,11 @@ function executePhpProtocol({ host, port, params, body }) {
 }
 
 // ============================================================
-// PARSEAR RESPOSTA PHP
+// PARSING DE BLOCO DE CABECALHO CGI (compartilhado entre
+// parsePhpResponse e o parser incremental)
 // ============================================================
 
-function parsePhpResponse(buffer) {
-    // Suporta \r\n\r\n e \n\n
-    let position = -1;
-    const str = buffer.toString('utf8');
-
-    const crlfPos = str.indexOf('\r\n\r\n');
-    const lfPos = str.indexOf('\n\n');
-
-    if (crlfPos !== -1 && (lfPos === -1 || crlfPos < lfPos)) {
-        position = crlfPos;
-    } else if (lfPos !== -1) {
-        position = lfPos;
-    }
-
-    if (position === -1) {
-        return {
-            status: 200,
-            headers: { 'Content-Type': 'text/html; charset=utf-8' },
-            body: buffer
-        };
-    }
-
-    const headerBuffer = buffer.subarray(0, position);
-    const body = buffer.subarray(position + (str.charAt(position) === '\r' ? 4 : 2));
-
-    const headerText = headerBuffer.toString('utf8');
-    const separator = str.charAt(position) === '\r' ? '\r\n' : '\n';
+function parseHeaderBlock(headerText, separator) {
     const lines = headerText.split(separator);
 
     let status = 200;
@@ -289,6 +356,137 @@ function parsePhpResponse(buffer) {
         headers[name] = value;
     }
 
+    return { status, headers };
+}
+
+// Localiza o delimitador de fim de cabecalho (\r\n\r\n ou \n\n)
+// em um buffer. Retorna { position, separatorLength } ou null.
+function findHeaderDelimiter(buffer) {
+    const str = buffer.toString('utf8');
+
+    const crlfPos = str.indexOf('\r\n\r\n');
+    const lfPos = str.indexOf('\n\n');
+
+    let position = -1;
+
+    if (crlfPos !== -1 && (lfPos === -1 || crlfPos < lfPos)) {
+        position = crlfPos;
+    } else if (lfPos !== -1) {
+        position = lfPos;
+    }
+
+    if (position === -1) {
+        return null;
+    }
+
+    const isCrlf = str.charAt(position) === '\r';
+    return { position, separatorLength: isCrlf ? 4 : 2, separator: isCrlf ? '\r\n' : '\n' };
+}
+
+// ============================================================
+// PARSER INCREMENTAL DE RESPOSTA PHP
+//
+// Consumido pelo servidor HTTP em modo streaming: aceita chunks
+// parciais de FCGI_STDOUT e emite eventos:
+//   { type: 'headers', status, headers }  (uma unica vez)
+//   { type: 'body', data: Buffer }        (0..N vezes)
+//
+// Os cabecalhos so sao emitidos quando o delimitador completo
+// (\r\n\r\n ou \n\n) foi encontrado — nunca "prematuramente".
+// ============================================================
+
+function createPhpResponseParser() {
+    let pending = Buffer.alloc(0);
+    let headersEmitted = false;
+
+    return {
+        push(chunk) {
+            const events = [];
+
+            if (headersEmitted) {
+                if (chunk.length) {
+                    events.push({ type: 'body', data: chunk });
+                }
+                return events;
+            }
+
+            pending = Buffer.concat([pending, chunk]);
+
+            const delimiter = findHeaderDelimiter(pending);
+
+            if (!delimiter) {
+                // Cabecalho ainda incompleto — acumula
+                return events;
+            }
+
+            const headerBuffer = pending.subarray(0, delimiter.position);
+            const body = pending.subarray(delimiter.position + delimiter.separatorLength);
+
+            const { status, headers } = parseHeaderBlock(
+                headerBuffer.toString('utf8'),
+                delimiter.separator
+            );
+
+            pending = Buffer.alloc(0);
+            headersEmitted = true;
+
+            events.push({ type: 'headers', status, headers });
+
+            if (body.length) {
+                events.push({ type: 'body', data: body });
+            }
+
+            return events;
+        },
+
+        complete() {
+            const events = [];
+
+            if (!headersEmitted) {
+                // Sem delimitador ate o fim: fallback identico a
+                // parsePhpResponse (status 200 + content-type padrao)
+                events.push({
+                    type: 'headers',
+                    status: 200,
+                    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+                });
+
+                if (pending.length) {
+                    events.push({ type: 'body', data: pending });
+                }
+
+                pending = Buffer.alloc(0);
+                headersEmitted = true;
+            }
+
+            return events;
+        }
+    };
+}
+
+// ============================================================
+// PARSEAR RESPOSTA PHP (modo legado: buffer unico)
+// ============================================================
+
+function parsePhpResponse(buffer) {
+    const delimiter = findHeaderDelimiter(buffer);
+
+    if (!delimiter) {
+        return {
+            status: 200,
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+            body: buffer
+        };
+    }
+
+    const headerBuffer = buffer.subarray(0, delimiter.position);
+    const body = buffer.subarray(delimiter.position + delimiter.separatorLength);
+
+    const { status, headers } = parseHeaderBlock(
+        headerBuffer.toString('utf8'),
+        delimiter.separator
+    );
+
     return { status, headers, body };
 }
 
@@ -307,13 +505,21 @@ const FORBIDDEN_HEADERS = new Set([
     'upgrade'
 ]);
 
-function sanitizeHeaders(headers) {
+function sanitizeHeaders(headers, { streaming = false } = {}) {
     const result = {};
 
     for (const [name, value] of Object.entries(headers)) {
         if (FORBIDDEN_HEADERS.has(name.toLowerCase())) {
             continue;
         }
+
+        // Em modo stream o total e desconhecido: manter um
+        // content-length vindo do PHP causaria
+        // ERR_HTTP_CONTENT_LENGTH_MISMATCH no Node.
+        if (streaming && name.toLowerCase() === 'content-length') {
+            continue;
+        }
+
         result[name] = value;
     }
 
@@ -327,5 +533,6 @@ function sanitizeHeaders(headers) {
 module.exports = {
     executePhpProtocol,
     parsePhpResponse,
+    createPhpResponseParser,
     sanitizeHeaders
 };

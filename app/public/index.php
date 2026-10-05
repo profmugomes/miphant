@@ -94,6 +94,10 @@ $rt->get('/timezone', function() {
     require_once(__DIR__ . '/timezone.php');
 });
 
+$rt->get('/streaming', function() {
+    require_once(__DIR__ . '/streaming.php');
+});
+
 $rt->get('/translate', function() {
     require_once(__DIR__ . '/translate.php');
 });

@@ -20,6 +20,9 @@
         "Timezone": {
             "page": "/timezone",
             "key": "CTRL+T"
+        },
+        "Streaming": {
+            "page": "/streaming"
         }
     },
     "Dialogs": {

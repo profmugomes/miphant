@@ -687,7 +687,72 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 
 ---
 
-## 9. Licença
+## 9. Streaming em Tempo Real
+
+O servidor HTTP do MiPhant encaminha a resposta PHP ao renderer
+**incrementalmente** (headers + corpo conforme o script produz),
+em vez de esperar o fim do script.
+
+### No PHP
+
+```php
+ob_implicit_flush(true);              // despeja cada escrita imediatamente
+header('Content-Type: text/plain; charset=utf-8');
+header('Cache-Control: no-cache');
+
+for ($i = 1; $i <= 10; $i++) {
+    echo "linha {$i}\n";
+    flush();                          // obrigatório (ver abaixo)
+    sleep(1);
+}
+```
+
+**Importante:** `flush()` (ou `ob_implicit_flush(true)`) é **obrigatório**.
+Com `implicit_flush=Off` e `output_buffering=0` (padrão do MiPhant),
+o worker PHP retém a saída até o fim do script se você não chamar `flush()`.
+
+No JavaScript, use `fetch` com leitura incremental:
+
+```js
+const response = await fetch('/stream.php');
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    process(decoder.decode(value, { stream: true }));
+}
+```
+
+Ou Server-Sent Events com `EventSource` (exemplos completos em
+`app/public/streaming.php`, com `stream.php` e `sse.php`).
+
+### Limites (config em `server/config.js`)
+
+| Config | Valor | Significado |
+|---|---|---|
+| `PHP_STREAM_IDLE_TIMEOUT` | 30s | Sem dados por 30s ⇒ stream morto. **Antes dos headers** a resposta é `502`; **depois dos headers** o socket é destruído (o cliente vê truncamento, não um fim "limpo") |
+| `PHP_STREAM_MAX_DURATION` | 310s | Teto absoluto de uma resposta (alinhado a `max_execution_time=300`). SSE/streams acima de 5min10 **são encerrados** — não existe stream persistente no MiPhant |
+| `PHP_MAX_RESPONSE_SIZE` | 50MB | Teto de bytes por resposta, inclusive em modo stream |
+| `PHP_TIMEOUT` | 30s | Somente no caminho legado (`executePhpProtocol` sem `onStdout`) — em produção não é usado |
+
+**Content-Length:** em modo stream o total é desconhecido até o fim,
+então o header `Content-Length` vindo do PHP é **descartado** e o Node
+usa `Transfer-Encoding: chunked` (válido em HTTP/1.1). Arquivos
+estáticos continuam com `Content-Length` normalmente.
+
+### Limitações por plataforma
+
+- **Linux (php-fpm)**: streams concorrentes limitados pelo pool
+  (`pm.max_children`, 2–16 workers).
+- **Windows (php-cgi.exe)**: processo **sequencial** — um stream aberto
+  bloqueia as próximas requisições PHP até ele terminar. Use streams
+  curtos no Windows.
+
+---
+
+## 10. Licença
 
 Copyright (c) 2025-2026 Murilo Gomes. All Rights Reserved.
 

@@ -11,7 +11,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 
 const { exists, findFreePort, getMimeType } = require('./utils');
-const { executePhpProtocol, parsePhpResponse, sanitizeHeaders } = require('./php-protocol');
+const { executePhpProtocol, createPhpResponseParser, sanitizeHeaders } = require('./php-protocol');
 const { getPhpPort } = require('./php-manager');
 const { log: loggerLog } = require('./logger');
 const { HOST, DEFAULT_HTTPS_PORT, MAX_BODY_SIZE } = require('./config');
@@ -210,49 +210,145 @@ function resolvePublicPath(requestPath) {
 }
 
 // ============================================================
-// EXECUTAR PHP
+// EXECUTAR PHP (STREAMING)
+//
+// A resposta e encaminhada ao cliente incrementalmente:
+//   - 1o evento de headers  -> res.writeHead() + flushHeaders()
+//   - eventos de corpo      -> res.write()
+//   - fim (FCGI_END_REQUEST)-> res.end()
 //
 // BUG FIX: error.message NAO e mais exposta ao cliente
+// BUG FIX: cliente que aborta o fetch destrui o socket FastCGI
+//          (o PHP detecta via ignore_user_abort e libera o worker)
 // ============================================================
 
 async function executePhp(req, res, filePath, serverPort, isRouted) {
+    const isHead = req.method === 'HEAD';
+    const controller = new AbortController();
+    let clientGone = false;
+
+    const onClose = () => {
+        if (!res.writableFinished) {
+            clientGone = true;
+            controller.abort();
+        }
+    };
+
+    // Erro de TLS/escrita na resposta durante o stream: cancela o
+    // PHP em vez de deixar o socket FastCGI orfao
+    const onResponseError = error => {
+        loggerLog('[PHP RESPONSE]', error.code || error.message);
+        clientGone = true;
+        controller.abort();
+    };
+
+    res.on('error', onResponseError);
+    res.on('close', onClose);
+
     try {
         const body = await readRequestBody(req);
         const params = createCgiParameters(req, filePath, serverPort, isRouted);
+
+        const parser = createPhpResponseParser();
+
+        // Emite eventos do parser. Retorna false quando o cliente
+        // nao aguenta mais escrita (backpressure) — o chamador deve
+        // pausar a leitura do socket FastCGI ate o 'drain'.
+        const emit = events => {
+            let writable = true;
+
+            for (const event of events) {
+                if (event.type === 'headers') {
+                    if (!res.headersSent) {
+                        // writeHead lança para status/header invalido
+                        // vindo do PHP — vira 502 tratado no catch
+                        res.writeHead(
+                            event.status,
+                            sanitizeHeaders(event.headers, { streaming: true })
+                        );
+                        res.flushHeaders();
+                    }
+                } else if (event.type === 'body') {
+                    if (!isHead && !clientGone && !res.writableEnded) {
+                        if (!res.write(event.data)) {
+                            writable = false;
+                        }
+                    }
+                }
+            }
+
+            return writable;
+        };
+
+        let drainRegistered = false;
 
         const result = await executePhpProtocol({
             host: HOST,
             port: getPhpPort(),
             params,
-            body
+            body,
+            signal: controller.signal,
+            onStdout: chunk => {
+                if (clientGone) return false;
+                return emit(parser.push(chunk));
+            },
+            onBackpressure: resume => {
+                if (drainRegistered) return;
+                drainRegistered = true;
+
+                if (res.writableEnded) {
+                    drainRegistered = false;
+                    resume();
+                    return;
+                }
+
+                res.once('drain', () => {
+                    drainRegistered = false;
+                    resume();
+                });
+            }
         });
 
         if (result.stderr.length) {
             console.error('[PHP STDERR]', result.stderr.toString('utf8'));
         }
 
-        const phpResponse = parsePhpResponse(result.stdout);
-        const headers = sanitizeHeaders(phpResponse.headers);
-
-        res.writeHead(phpResponse.status, headers);
-
-        if (req.method === 'HEAD') {
-            res.end();
+        if (clientGone || res.writableEnded) {
             return;
         }
 
-        res.end(phpResponse.body);
+        // Garante headers mesmo com resposta sem corpo
+        emit(parser.complete());
+        res.end();
     } catch (error) {
+        // Cliente desconectou durante o upload do body (ECONNRESET)
+        // ou abortou via AbortController — nao e erro do servidor
+        if ((error && error.code === 'ABORTED') || clientGone || res.destroyed) {
+            loggerLog('[PHP REQUEST] Abortado pelo cliente.');
+            return;
+        }
+
         console.error('[PHP REQUEST]', error);
 
         if (!res.headersSent) {
             res.writeHead(502, {
                 'Content-Type': 'text/plain; charset=utf-8'
             });
+            // BUG FIX: nao expor error.message ao cliente
+            res.end('PHP Server Error');
+            return;
         }
 
-        // BUG FIX: nao expor error.message ao cliente
-        res.end('PHP Server Error');
+        // Erro com stream ja iniciado (timeout, resposta invalida apos
+        // headers, PHP morreu): destruir o socket faz o cliente ver o
+        // truncamento — res.end() enviaria last-chunk valido e esconderia
+        // a falha (fetch terminaria "normalmente" com corpo incompleto)
+        if (!res.writableEnded) {
+            res.destroy();
+        }
+    } finally {
+        res.removeListener('close', onClose);
+        res.removeListener('error', onResponseError);
     }
 }
 
