@@ -8,12 +8,15 @@ files:
   - "!config-dev.sh"
   - "!config.sh"
   - "!compile.sh"
+  - "!AGENTS.md"
+  - "!SKILLS.md"
 extraResources:
   - "./app/"
   - "./php/LICENSE"
   - "./php/php.ini"
   - "./LICENSE.md"
   - "./README.md"
+  - "./SKILLS.md"
 win:
   artifactName: ${productName}-${version}-win.${ext}
   icon: icon/miphant.ico
