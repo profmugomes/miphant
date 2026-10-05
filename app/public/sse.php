@@ -1,5 +1,5 @@
 <?php
-// Demo: Server-Sent Events (SSE) em tempo real.
+// Server-Sent Events (SSE) em tempo real.
 // O cliente usa EventSource e recebe um evento por segundo.
 
 ob_implicit_flush(true);

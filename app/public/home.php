@@ -57,6 +57,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
             <li><a href="/cadastro/listedit/1/" target="_blank" rel="noopener">List Edit with ID</a></li>
             <li><a href="/timezone" target="_blank" rel="noopener">Timezone</a></li>
             <li><a href="/translate" target="_blank" rel="noopener">Translate</a></li>
+            <li><a href="/streaming" target="_blank" rel="noopener">Streaming</a></li>
         </ul>
     </div>
 

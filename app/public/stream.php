@@ -1,5 +1,5 @@
 <?php
-// Demo: streaming de resposta em tempo real.
+// Streaming de resposta em tempo real.
 // Cada linha deve aparecer ~1s antes da proxima (nao tudo no fim).
 
 // Garante que a resposta saia do PHP imediatamente
