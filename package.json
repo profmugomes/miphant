@@ -15,7 +15,7 @@
     },
     "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>",
     "homepage": "https://www.profmugomes.com.br",
-    "license": "SEE LICENSE IN LICENSE.md",
+    "license": "MIT",
     "devDependencies": {
         "electron": "^45.0.0",
         "electron-builder": "^26.4.0"
