@@ -42,7 +42,7 @@ $license = file_get_contents(__DIR__ . '/../../LICENSE.md');
 
     <div class="card">
         <h2>License</h2>
-        <?php echo $about->setLicense('PolyForm Perimeter License', $license); ?>
+        <?php echo $about->setLicense('MIT', $license); ?>
     </div>
 
     <a href="/" class="btn btn-outline">&larr; Back</a>

@@ -754,9 +754,8 @@ estáticos continuam com `Content-Length` normalmente.
 
 ## 10. Licença
 
-Copyright (c) 2025-2026 Murilo Gomes. All Rights Reserved.
+Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>.
 
-Licensed under the PolyForm Perimeter License 1.0.1.
-See [LICENSE.md](LICENSE.md) for details.
+SPDX-License-Identifier: MIT
 
 **Resumo**: Você pode usar, modificar e distribuir o software, mas não pode fornecer um produto que compita com ele.

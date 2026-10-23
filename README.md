@@ -1,6 +1,6 @@
 # MiPhant
 
-[![License](https://img.shields.io/badge/license-PolyForm%20Perimeter%201.0.1-5351FB)](LICENSE.md)
+[![License](https://img.shields.io/badge/license-MIT-5351FB)](LICENSE.md)
 
 MiPhant is a desktop application runner that lets you build and run PHP applications as native desktop apps on **Linux** and **Windows**. It combines Electron with a built-in HTTPS server that executes PHP through the FastCGI protocol, using platform-native PHP runtimes.
 
@@ -176,7 +176,7 @@ The application is configured via `app/config.json`:
   "app": {
     "id": "miphant",
     "name": "MiPhant",
-    "version": "6.0.0",
+    "version": "7.0.0",
     "width": 800,
     "height": 600,
     "resizable": true,
@@ -190,7 +190,7 @@ The application is configured via `app/config.json`:
       "url": "https://www.profmugomes.com.br"
     },
     "homepage": "https://github.com/profmugomes/miphant/",
-    "license": "SEE LICENSE IN LICENSE.md",
+    "license": "MIT",
     "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
   },
   "server": {
@@ -344,45 +344,8 @@ bcmath, calendar, ctype, curl, dom, exif, fileinfo, filter, gd, iconv, mbstring,
 
 ## License
 
-Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>. All rights reserved.
+Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>
 
-This project is licensed under the [PolyForm Perimeter License 1.0.1](https://polyformproject.org/licenses/perimeter/1.0.1).
+Licensed under the [MIT](https://github.com/profmugomes/miphant/blob/main/LICENSE) license.
 
-### Summary
-
-You may:
-
-- ✔ Use the software for any purpose (personal, educational, commercial).
-- ✔ Inspect and study the source code.
-- ✔ Modify the software and create derivative works.
-- ✔ Distribute copies of the software (with or without modifications).
-
-You may not:
-
-- ✖ Provide a product that competes with the software.
-
-### What counts as competition?
-
-A product competes with MiPhant if it is offered as a substitute for its functionality or value, regardless of:
-
-- How it is designed or deployed.
-- Whether it is provided via an interface (service, library, or plugin).
-- Whether it is ported to another platform or programming language.
-- Whether it is provided for free.
-
-### Permitted use examples
-
-- Using MiPhant to build desktop applications for yourself.
-- Using MiPhant in educational or research environments.
-- Modifying MiPhant to suit your needs.
-- Distributing MiPhant to third parties (without competitive intent).
-
-### NOT permitted use examples
-
-- Creating a product that functions as an alternative to MiPhant.
-- Offering a service that replaces MiPhant's functionality.
-- Selling a modified version of MiPhant as a competing product.
-
-See the full license terms in [LICENSE.md](LICENSE.md).
-
-This summary is provided for convenience only.
+All contributions to the MiPhant are subject to this license.
