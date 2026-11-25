@@ -3,6 +3,10 @@
         "Home": {
             "page": "/home",
             "key": "CTRL+H"
+        },
+        "Close": {
+            "script": "miphant.close()",
+            "key": "Alt+F4"
         }
     },
     "System": {
