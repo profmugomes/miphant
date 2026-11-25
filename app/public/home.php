@@ -36,6 +36,7 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
         <h2>Examples</h2>
         <ul>
             <li><a href="/about" target="_blank" rel="noopener">About</a></li>
+            <li><a href="/controls" target="_blank" rel="noopener">Controls</a></li>
             <li><a href="/args" target="_blank" rel="noopener">Args</a></li>
             <li><a href="/cookies" target="_blank" rel="noopener">Cookies</a></li>
             <li><a href="/extramenu/" target="_blank" rel="noopener">Extra Menu</a></li>
