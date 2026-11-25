@@ -21,6 +21,8 @@ app/
 │   ├── langs/               # Tradução
 │   ├── system/              # Sistema
 │   └── security/            # Segurança
+├── guard/
+│   └── php-guard.php        # Guard auto_prepend (interno, não alterar)
 ├── style.css                # Design system dark
 ├── index.php                # Página inicial
 └── *.php                    # Páginas da aplicação
@@ -35,9 +37,12 @@ app/
 | `app/menus/*.json` | Definições de menu | Leitura pelo Electron |
 | `app/langs/*.json` | Traduções | Leitura pelo PHP |
 | `app/libs/` | MiPhantLibs | Leitura pelo PHP |
+| `app/guard/php-guard.php` | Guard de autenticação Node→PHP | Somente leitura — interno, não alterar |
 | `app/style.css` | Design system | Leitura pelo HTML |
 
 > **Nota**: Arquivos internos do servidor (`server/`, `node_modules/`, etc.) estão empacotados dentro do ASAR e não são acessíveis diretamente pela aplicação PHP.
+>
+> O `app/guard/php-guard.php` é carregado como `auto_prepend_file` em **toda** requisição. Ele não é uma página e não deve ser editado: sem ele, o PHP responde `403`. Detalhes em [Segurança de Runtime](#10-segurança-de-runtime-psk).
 
 ---
 
@@ -82,11 +87,24 @@ $func->redirect('pagina.php', ['id' => 42, 'nome' => 'teste']);
 $func->newWindow('pagina.php', 1024, 768);
 
 // Abre URL externa no navegador do sistema
-$func->openURL('https://example.com');
+$func->openURL('https://seu-dominio');
 
 // Fecha a janela atual
 $func->closeWindow();
 ```
+
+### Links externos
+
+Toda navegação é confinada à origem interna (`https://localhost:<porta>`).
+Um link para outro domínio **não** navega dentro da janela: o MiPhant
+bloqueia a navegação e abre a URL no navegador do sistema
+(`shell.openExternal`). Isso evita que uma página externa herde a bridge
+`window.miphant`. Use `miphant.openURL(url)` quando quiser abrir algo fora
+do app.
+
+URLs internas continuam funcionando normalmente (`index.php`, `/pagina`,
+`?id=42`), inclusive via `window.location.assign`, `miphant.newWindow` e
+`$func->redirect`.
 
 ### Menu Principal
 
@@ -179,7 +197,7 @@ use MiPhantLibs\app\config;
 
 $cfg = new config();
 $width = $cfg->get('app', 'width');        // 800
-$version = $cfg->get('app', 'version');    // "6.0.0"
+$version = $cfg->get('app', 'version');    // "7.2.0"
 $author = $cfg->get('app', 'author', 'name'); // "Murilo Gomes"
 ```
 
@@ -549,7 +567,7 @@ O app é configurado via `app/config.json`:
     "app": {
         "id": "miphant",
         "name": "MiPhant",
-        "version": "6.0.0",
+        "version": "7.2.0",
         "width": 800,
         "height": 600,
         "resizable": true,
@@ -567,7 +585,6 @@ O app é configurado via `app/config.json`:
         "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
     },
     "server": {
-        "perm": true,
         "router": false
     },
     "dev": {
@@ -595,12 +612,15 @@ O app é configurado via `app/config.json`:
 - `copyright`: Aviso de copyright
 
 **server**
-- `perm`: Aplica permissão de execução no binário PHP (Linux)
 - `router`: Habilita roteamento PHP (front controller pattern)
 
 **dev**
 - `menu`: Mostra menu de desenvolvimento
-- `tools`: Abre DevTools automaticamente
+- `tools`: Abre DevTools automaticamente e habilita páginas de diagnóstico (`/phpinfo`)
+
+> **Segurança não é configurável.** Não existe chave, `enabled` ou modo em
+> `app/config.json`: a PSK de runtime, o pinning de certificado, a validação
+> de IPC e o guard PHP estão sempre ativos. Ver seção 10.
 
 ---
 
@@ -685,6 +705,12 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 - [ ] Seguir padrão dark theme
 - [ ] Manter consistência visual
 
+### Segurança
+
+- [ ] Não usar domínios externos como exemplo; links externos abrem no navegador do sistema
+- [ ] Não tentar "desligar" a PSK nem editar `app/guard/php-guard.php`
+- [ ] Páginas de diagnóstico (`phpinfo` e afins) só quando `dev.tools` estiver ativo
+
 ---
 
 ## 9. Streaming em Tempo Real
@@ -728,6 +754,9 @@ while (true) {
 Ou Server-Sent Events com `EventSource` (exemplos completos em
 `app/public/streaming.php`, com `stream.php` e `sse.php`).
 
+> `fetch` e `EventSource` usam a mesma origem interna e recebem o header de
+> autenticação automaticamente — nada muda no código da página (ver seção 10).
+
 ### Limites (config em `server/config.js`)
 
 | Config | Valor | Significado |
@@ -752,10 +781,104 @@ estáticos continuam com `Content-Length` normalmente.
 
 ---
 
-## 10. Licença
+## 10. Segurança de Runtime (PSK)
+
+O servidor HTTPS do MiPhant escuta em loopback e, sem proteção, qualquer
+processo local poderia falar com ele. Por isso **cada execução gera uma chave
+pré-compartilhada (PSK) de 256 bits**, só em memória, descartada ao fechar o
+app. Nada é gravado em disco, `process.env`, cookies ou `config.json`.
+
+### O que isso muda para quem escreve páginas
+
+**Nada no código.** O Chromium injeta o header `X-MiPhant-Auth`
+automaticamente em toda requisição da janela oficial, então continuam
+funcionando sem alteração:
+
+- navegação e subrecursos (`<link>`, `<script>`, `<img>`, CSS);
+- `fetch`, `XMLHttpRequest`, `EventSource` (SSE) e streams;
+- `HEAD` e preflight `OPTIONS`;
+- `miphant.*` (todos os handlers IPC validam a origem da página).
+
+O que muda no comportamento:
+
+- **Outros programas** que tentem abrir `https://localhost:<porta>` recebem
+  `404` vazio (sem corpo, sem dica de rota).
+- **Links externos** são bloqueados na janela e abertos no navegador do
+  sistema (ver seção 2).
+- **`/phpinfo`** responde `404` fora do modo `dev.tools`.
+
+### Camadas
+
+| Camada | Quem autentica | Mecanismo |
+|---|---|---|
+| Janela → servidor HTTPS | Chromium | Header `X-MiPhant-Auth` injetado por `session.webRequest.onBeforeSendHeaders`; comparado em tempo constante no gate |
+| Servidor Node → PHP | `app/guard/php-guard.php` | HMAC-SHA256 sobre 8 campos + timestamp + nonce, validado via `auto_prepend_file` |
+
+O gate HTTP também valida `Host` exato (`localhost:<porta>` ou
+`127.0.0.1:<porta>`), `Origin` quando presente, rejeita
+`Sec-Fetch-Site: cross-site`/`same-site` e derruba conexões após excesso de
+falhas (requisições autenticadas nunca são limitadas).
+
+### Node → PHP (guard)
+
+- A chave esperada vem do **ambiente do processo PHP**
+  (`MIPHANT_GUARD_KEY`), nunca da requisição. Um processo local que fale
+  direto com o PHP não consegue assinar a própria requisição.
+- O guard remove `MIPHANT_GUARD_KEY` e `MIPHANT_PHP_*` de `$_SERVER`/`$_ENV`
+  **antes** do script do usuário rodar — `phpinfo()`, `var_dump($_SERVER)` e
+  páginas de debug não veem nada.
+- Qualquer falha resulta em `403 Forbidden` sem detalhes (fail closed).
+  A única isenção é o SAPI CLI (`cli`, `cli-server`), inalcançável por HTTP.
+
+### Transporte PHP por plataforma
+
+| Plataforma | Transporte | Proteção extra |
+|---|---|---|
+| Linux | Unix socket `<userData>/server/php/php-fpm.sock` com `listen.mode = 0600` | Permissão de filesystem + guard |
+| Windows | TCP `127.0.0.1:<porta efêmera>` | Guard HMAC (php-cgi não tem socket Unix) |
+
+Se o caminho do socket for longo demais (Flatpak/Snap) ou o bind falhar, o
+MiPhant cai para TCP e registra aviso — o guard continua ativo.
+
+### Outras proteções
+
+- **Certificate pinning**: `setCertificateVerifyProc` aceita apenas o
+  fingerprint SHA-256 do certificado do MiPhant para `localhost`/`127.0.0.1`.
+- **Sem corrida de porta**: `listen(0, '127.0.0.1')` e leitura da porta real
+  em `server.address()`.
+- **IPC**: todos os `ipcMain.handle` verificam `event.senderFrame.url` contra a
+  origem interna.
+- **Navegação**: `will-navigate` bloqueia destinos externos.
+
+### Limites (o que a PSK não cobre)
+
+| Protege contra | Não protege contra |
+|---|---|
+| Outros apps/navegadores acessando a porta local | Processo do mesmo usuário lendo memória (`ptrace`, `/proc/<pid>/mem`) |
+| Varredura de portas seguida de requisições | DevTools aberto (painel Network mostra o header) |
+| CSRF / DNS rebinding vindos de páginas web | Root/malware, swap ou hibernação |
+| Acesso direto ao FastCGI/PHP | DoS local esgotando conexões |
+| Reutilização da chave após fechar o app | |
+| MITM local com CA própria | |
+
+### Regras para desenvolvimento
+
+- **Não** edite `app/guard/php-guard.php` nem as constantes de segurança em
+  `server/config.js` para "facilitar" testes.
+- **Não** adicione opção em `app/config.json` para desligar a proteção: a
+  política é fixa de propósito.
+- **Não** exponha a chave no renderer, em logs, em query string ou em cookie.
+- Para depurar uma requisição, use `MIPHANT_DEBUG=1` (logs do main) e
+  `dev.tools` (DevTools/phpinfo) — nunca imprima a chave.
+
+---
+
+## 11. Licença
 
 Copyright (c) 2025-2026 Murilo Gomes <profmugomes.com.br>.
 
 SPDX-License-Identifier: MIT
 
-**Resumo**: Você pode usar, modificar e distribuir o software, mas não pode fornecer um produto que compita com ele.
+**Resumo**: permissão para usar, copiar, modificar, publicar e distribuir,
+inclusive comercialmente, desde que o aviso de copyright e a licença sejam
+mantidos. O software é fornecido "como está", sem garantias.
