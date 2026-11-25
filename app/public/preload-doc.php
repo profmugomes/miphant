@@ -149,7 +149,7 @@ if (result === 0) { /* Yes */ } else { /* No */ }</code></pre>
         <button class="btn btn-outline" onclick="miphant.openURL('https://github.com/profmugomes/miphant')">Open GitHub</button>
 
         <h3 class="mt-2">Usage</h3>
-        <pre><code>miphant.openURL('https://example.com');</code></pre>
+        <pre><code>miphant.openURL('https://seu-dominio');</code></pre>
     </div>
 
     <!-- ==================== translate ==================== -->
@@ -309,7 +309,7 @@ if (path) { fs.writeFileSync(path, data); }</code></pre>
         <h3 class="mt-2">Menu JSON Format</h3>
         <pre><code>{
     "Label": { "page": "target.php" },
-    "External": { "url": "https://example.com" },
+    "External": { "url": "https://seu-dominio" },
     "Action": { "script": "console.log('clicked');" }
 }</code></pre>
 
