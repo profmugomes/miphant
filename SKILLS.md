@@ -197,7 +197,7 @@ use MiPhantLibs\app\config;
 
 $cfg = new config();
 $width = $cfg->get('app', 'width');        // 800
-$version = $cfg->get('app', 'version');    // "7.2.0"
+$version = $cfg->get('app', 'version');    // "7.1.0"
 $author = $cfg->get('app', 'author', 'name'); // "Murilo Gomes"
 ```
 
@@ -567,7 +567,7 @@ O app é configurado via `app/config.json`:
     "app": {
         "id": "miphant",
         "name": "MiPhant",
-        "version": "7.2.0",
+        "version": "7.1.0",
         "width": 800,
         "height": 600,
         "resizable": true,

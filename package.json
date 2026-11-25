@@ -1,12 +1,15 @@
 {
     "name": "miphant",
-    "version": "7.0.0",
+    "version": "7.1.0",
     "description": "MiPhant is a software that runs applications developed in PHP for desktop Linux Ubuntu and Windows.",
     "main": "main.js",
     "scripts": {
         "start": "electron .",
         "dist-win": "electron-builder --win",
-        "dist-linux": "electron-builder --linux"
+        "dist-linux": "electron-builder --linux",
+        "test": "node --test tests/unit",
+        "test:integration": "node --test tests/integration",
+        "test:all": "node --test tests/unit tests/integration"
     },
     "author": {
         "name": "Murilo Gomes",

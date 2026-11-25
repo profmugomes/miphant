@@ -265,7 +265,7 @@ The application is configured via `app/config.json`:
   "app": {
     "id": "miphant",
     "name": "MiPhant",
-    "version": "7.2.0",
+    "version": "7.1.0",
     "width": 800,
     "height": 600,
     "resizable": true,
