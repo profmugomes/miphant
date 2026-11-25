@@ -4,13 +4,8 @@ $lang = $_ENV['MIPHANT_LANG'] ?? 'en';
 if (!empty($_GET['filename'])) {
     $filename = filter_input(INPUT_GET, 'filename', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     if ($filename && file_exists($filename)) {
-        echo '<!DOCTYPE html><html><head><title>File Content</title>';
-        echo '<link rel="stylesheet" href="/style.css">';
-        echo '</head><body>';
         echo '<h1>' . htmlspecialchars(basename($filename)) . '</h1>';
-        echo '<div class="card"><pre><code>' . htmlspecialchars(file_get_contents($filename)) . '</code></pre></div>';
-        echo '<a href="openfile.php" class="btn btn-outline">&larr; Open another file</a>';
-        echo '</body></html>';
+        echo '<textarea rows="7" cols="10" style="width: 100%;height:400px">' . htmlspecialchars(file_get_contents($filename)) . '</textarea>';
         exit;
     }
 }
