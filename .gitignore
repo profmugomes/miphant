@@ -156,3 +156,6 @@ app/public/composer.lock
 
 # agent
 AGENTS.md
+
+# tests
+tests/
