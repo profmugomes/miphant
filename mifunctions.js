@@ -8,9 +8,24 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = {
-    mifunctions: function (win, milang, miphantNewWindow) {
+    // isOfficialSender: valida que o IPC veio de uma pagina do proprio
+    // servidor interno (evita que uma pagina externa use a bridge nativa)
+    mifunctions: function (win, milang, miphantNewWindow, isOfficialSender) {
+        const assertOfficialSender = (event) => {
+            if (typeof isOfficialSender !== 'function' || !isOfficialSender(event)) {
+                throw new Error('Unauthorized IPC request');
+            }
+        };
+
+        const register = (channel, handler) => {
+            ipcMain.handle(channel, async (event, ...args) => {
+                assertOfficialSender(event);
+                return handler(event, ...args);
+            });
+        };
+
         // Função para selecionar pasta
-        ipcMain.handle('appSelecionarDiretorio', async () => {
+        register('appSelecionarDiretorio', async () => {
             const { canceled, filePaths } = await dialog.showOpenDialog({ properties: ['openDirectory'] });
             if (!canceled) {
                 return filePaths[0];
@@ -18,7 +33,7 @@ module.exports = {
         });
 
         // Função para abrir arquivo
-        ipcMain.handle('appAbrirArquivo', async (_, multi) => {
+        register('appAbrirArquivo', async (_event, multi) => {
             let sProperties = [
                 'openFile',
                 (multi) ? 'multiSelections' : ''
@@ -34,7 +49,7 @@ module.exports = {
         });
 
         // Função para salvar arquivo
-        ipcMain.handle('appSalvarArquivo', async () => {
+        register('appSalvarArquivo', async () => {
             const { canceled, filePath } = await dialog.showSaveDialog({});
             if (!canceled) {
                 return filePath;
@@ -42,12 +57,12 @@ module.exports = {
         });
 
         // Abrir aplicativo externo
-        ipcMain.handle('appExterno', async (_, url) => {
+        register('appExterno', async (_event, url) => {
             shell.openExternal(url);
         });
 
         // Obter versão do aplicativo e recursos
-        ipcMain.handle('appVersao', async (_, tipo) => {
+        register('appVersao', async (_event, tipo) => {
             if (tipo == 'miphant') {
                 return require('electron').app.getVersion();
             } else if (tipo == 'electron') {
@@ -62,7 +77,7 @@ module.exports = {
         });
 
         // Função para caixa de alerta
-        ipcMain.handle('appMessage', async (_, title, msg, type, button) => {
+        register('appMessage', async (_event, title, msg, type, button) => {
             let sButtons = [button];
 
             let options = {
@@ -77,7 +92,7 @@ module.exports = {
         });
 
         // Função para caixa de confirmação
-        ipcMain.handle('appConfirm', async (_, title, msg, type, ...buttons) => {
+        register('appConfirm', async (_event, title, msg, type, ...buttons) => {
             let sButtons = [...buttons];
 
             let options = {
@@ -92,17 +107,17 @@ module.exports = {
         });
 
         // Abre uma nova janela personalizada
-        ipcMain.handle('appNewWindow', async (_, url, width, height, resizable, frame, hide, menu) => {
+        register('appNewWindow', async (_event, url, width, height, resizable, frame, hide, menu) => {
             miphantNewWindow(url, width, height, resizable, frame, hide, menu);
         });
 
         // Traduzir
-        ipcMain.handle('appTraduzir', async (_, text, ...values) => {
+        register('appTraduzir', async (_event, text, ...values) => {
             return milang.traduzir(text, ...values);
         });
 
         // DevTools
-        ipcMain.handle('appDevTools', async (_) => {
+        register('appDevTools', async () => {
             const focusedWindow = BrowserWindow.getFocusedWindow();
             if (focusedWindow) {
                 focusedWindow.webContents.openDevTools();
@@ -110,17 +125,17 @@ module.exports = {
         });
 
         // Notification
-        ipcMain.handle('appNotification', async (_, title, text) => {
+        register('appNotification', async (_event, title, text) => {
             new Notification({ title: title, body: text }).show();
         });
 
         // Check File Exists
-        ipcMain.handle('appFileExists', async (_, filename) => {
+        register('appFileExists', async (_event, filename) => {
             return fs.existsSync(filename);
         });
 
         // Tray
-        ipcMain.handle('appTray', async (_, title, tooltip, image, menus) => {
+        register('appTray', async (_event, title, tooltip, image, menus) => {
             const icon = nativeImage.createFromPath(image);
             let tray = new Tray(icon);
 
@@ -161,7 +176,7 @@ module.exports = {
         });
 
         // ExportPDF
-        ipcMain.handle('appExportPDF', async (_, filename, options) => {
+        register('appExportPDF', async (_event, filename, options) => {
             let pdfOptions = options;
             if (!pdfOptions) {
                 pdfOptions = {

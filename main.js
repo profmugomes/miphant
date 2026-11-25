@@ -3,9 +3,10 @@
 
 // Site: https://www.profmugomes.com.br
 
-const { app, BrowserWindow, Menu, MenuItem, ipcMain, session } = require('electron');
+const { app, BrowserWindow, Menu, MenuItem, ipcMain, session, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const sOS = require('os');
 const { spawn } = require('child_process');
 const { createSelfSignedCertificate } = require('./server/certificates');
@@ -15,10 +16,12 @@ const {
     stopHttps,
     setPublicRoot,
     getHttpsPort,
+    getServerOrigin,
     setRouter
 } = require('./server/http-server');
 const { setDebugEnabled, log: loggerLog } = require('./server/logger');
 const { HOST } = require('./server/config');
+const security = require('./server/security');
 
 const sPlatform = sOS.platform().toLowerCase();
 const miphantPath = app.getAppPath().replace('app.asar', '');
@@ -103,21 +106,167 @@ function getCertificateDirectory() {
     return directory;
 }
 
-function configureElectronCertificateTrust() {
+// ============================================================
+// PINNING DO CERTIFICADO
+//
+// Antes: qualquer certificado era aceito para localhost, o que
+// permitia MITM local com CA propria. Agora somente o nosso
+// certificado (fingerprint SHA-256) e aceito.
+// ============================================================
+
+let trustedFingerprint = null;
+
+function normalizeFingerprint(value) {
+    return String(value || '').replace(/:/g, '').toLowerCase();
+}
+
+function fingerprintOfCertificate(certificate) {
+    if (!certificate || !certificate.data) {
+        return null;
+    }
+
+    try {
+        return normalizeFingerprint(
+            new crypto.X509Certificate(certificate.data).fingerprint256
+        );
+    } catch {
+        return null;
+    }
+}
+
+function configureElectronCertificateTrust(certificate) {
+    try {
+        trustedFingerprint = normalizeFingerprint(
+            new crypto.X509Certificate(
+                fs.readFileSync(certificate.cert)
+            ).fingerprint256
+        );
+    } catch (error) {
+        console.error('[HTTPS] Falha ao calcular fingerprint:', error);
+        trustedFingerprint = null;
+    }
+
     session.defaultSession.setCertificateVerifyProc((request, callback) => {
         const hostname = request.hostname;
 
         if (
-            hostname === 'localhost' ||
-            hostname === HOST ||
-            hostname === '::1'
+            hostname !== 'localhost' &&
+            hostname !== HOST
         ) {
-            callback(0);
+            callback(request.errorCode);
             return;
         }
 
-        callback(request.errorCode);
+        const presented = fingerprintOfCertificate(request.certificate);
+
+        if (!trustedFingerprint || !presented || presented !== trustedFingerprint) {
+            loggerLog('[HTTPS] Certificado recusado (fingerprint divergente).');
+            callback(-2);
+            return;
+        }
+
+        callback(0);
     });
+}
+
+// ============================================================
+// INJECAO DO HEADER DE AUTENTICACAO NO RENDERER
+//
+// Feita pelo Chromium (webRequest), nunca pelo JS da pagina.
+// Injeta apenas na porta exata do servidor e apenas quando a
+// requisicao parte de uma pagina do MiPhant.
+// ============================================================
+
+let removeRendererAuth = null;
+
+function installRendererAuth(electronSession, port) {
+    const auth = security.getHttpAuthHeader();
+
+    if (!auth) {
+        throw new Error('Contexto de seguranca nao inicializado.');
+    }
+
+    const expectedPort = String(port);
+    const allowedOrigins = new Set([
+        `https://localhost:${expectedPort}`,
+        `https://127.0.0.1:${expectedPort}`
+    ]);
+
+    const listener = (details, callback) => {
+        let parsed;
+
+        try {
+            parsed = new URL(details.url);
+        } catch {
+            callback({});
+            return;
+        }
+
+        const isTarget =
+            parsed.protocol === 'https:' &&
+            parsed.port === expectedPort &&
+            ['localhost', '127.0.0.1'].includes(parsed.hostname);
+
+        const isMainFrame = details.resourceType === 'mainFrame';
+        const fromOurPage = allowedOrigins.has(details.initiatorOrigin);
+
+        // Fora do nosso servidor ou originada por outra pagina: nao injeta
+        if (!isTarget || (!isMainFrame && !fromOurPage)) {
+            callback({});
+            return;
+        }
+
+        const requestHeaders = { ...details.requestHeaders };
+
+        for (const name of Object.keys(requestHeaders)) {
+            if (name.toLowerCase() === auth.name) {
+                delete requestHeaders[name];
+            }
+        }
+
+        requestHeaders[auth.name] = auth.value;
+        callback({ requestHeaders });
+    };
+
+    electronSession.webRequest.onBeforeSendHeaders(
+        { urls: ['https://localhost/*', 'https://127.0.0.1/*'] },
+        listener
+    );
+
+    removeRendererAuth = () => {
+        electronSession.webRequest.onBeforeSendHeaders(null);
+        removeRendererAuth = null;
+    };
+}
+
+// ============================================================
+// ORIGEM OFICIAL (IPC e navegacao)
+// ============================================================
+
+function isInternalUrl(targetUrl) {
+    const origin = getServerOrigin();
+
+    if (!origin) {
+        return false;
+    }
+
+    try {
+        return new URL(targetUrl).origin === origin;
+    } catch {
+        return false;
+    }
+}
+
+function isOfficialSender(event) {
+    const origin = getServerOrigin();
+
+    if (!origin || !event || !event.senderFrame) {
+        return false;
+    }
+
+    const frameUrl = event.senderFrame.url;
+
+    return typeof frameUrl === 'string' && frameUrl.startsWith(origin + '/');
 }
 
 async function shutdown() {
@@ -128,6 +277,13 @@ async function shutdown() {
 
     await stopHttps();
     await stopPhp();
+
+    // Remove a injecao do header e apaga a chave da memoria
+    if (removeRendererAuth) {
+        removeRendererAuth();
+    }
+
+    security.wipe();
 
     loggerLog('[SERVER] Finalizado.');
 }
@@ -143,33 +299,42 @@ async function startMiPhantServer(win) {
         process.env.MIPHANT_USERNAME = sOS.userInfo().username;
         process.env.MIPHANT_HOMEDIR = sOS.userInfo().homedir;
         process.env.MIPHANT_PLATFORM = sPlatform;
+        process.env.MIPHANT_DEV = (config.dev && config.dev.tools) ? '1' : '0';
         // MIPHANT_LANG já foi definida em milang.js (antes de main.js executar)
 
         // Debug mode
-        setDebugEnabled(config.dev.tools);
+        setDebugEnabled(config.dev.tools || process.env.MIPHANT_DEBUG === '1');
 
-        // 1. Certificado
+        // 1. Contexto de seguranca (PSK) — antes do PHP e do servidor.
+        //    Protecao obrigatoria: nao ha chave em config.json.
+        security.create();
+        loggerLog('[SECURITY] PSK fingerprint:', security.getFingerprint());
+
+        // 2. Certificado
         const certDir = getCertificateDirectory();
         const certificate = createSelfSignedCertificate(certDir);
 
-        // 2. Trust do certificado no Electron
-        configureElectronCertificateTrust();
+        // 3. Trust + pinning do certificado no Electron
+        configureElectronCertificateTrust(certificate);
 
-        // 3. Public root
+        // 4. Public root
         setPublicRoot(getPublicRoot());
 
-        // 3.1 Router (URL Amigavel)
+        // 4.1 Router (URL Amigavel)
         if (config.server && config.server.router) {
             setRouter(true);
         }
 
-        // 4. PHP
+        // 5. PHP (guard auto_prepend obrigatorio)
         await startPhp(getResourcesRoot(), app.getPath('userData'));
 
-        // 5. Servidor HTTPS
+        // 6. Servidor HTTPS
         await startHttpsServer(certificate);
 
-        // 6. Janela
+        // 7. Injecao do header de autenticacao — antes do primeiro loadURL
+        installRendererAuth(session.defaultSession, getHttpsPort());
+
+        // 8. Janela
         sServerName = `https://localhost:${getHttpsPort()}/`;
 
         loggerLog('[ELECTRON]', sServerName);
@@ -211,9 +376,13 @@ async function miphantNewWindow(url, width, height, resizable, frame, hide, menu
         await startMiPhantServer(sNewWindow);
 
         const mifunctions = require(path.join(app.getAppPath(), '/mifunctions.js'));
-        mifunctions.mifunctions(sNewWindow, milang, miphantNewWindow);
+        mifunctions.mifunctions(sNewWindow, milang, miphantNewWindow, isOfficialSender);
 
         ipcMain.handle('appSair', async (event) => {
+            if (!isOfficialSender(event)) {
+                throw new Error('Unauthorized IPC request');
+            }
+
             app.quit();
         });
 
@@ -236,16 +405,42 @@ async function miphantNewWindow(url, width, height, resizable, frame, hide, menu
         sNewWindow.webContents.openDevTools();
     }
 
+    // Diagnostico: falha de carregamento nunca mais silenciosa
+    sNewWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        if (isMainFrame) {
+            console.error('[ELECTRON] Falha ao carregar', validatedURL, errorCode, errorDescription);
+        }
+    });
+
+    sNewWindow.webContents.on('did-navigate', (event, url, httpResponseCode) => {
+        loggerLog('[ELECTRON] Navegou', url, 'HTTP', httpResponseCode);
+    });
+
     createMenuContext(sNewWindow);
+
+    // Navegacao interna (menus, links relativos) e permitida; qualquer
+    // destino externo abre no navegador do sistema. Sem isso, uma pagina
+    // externa herdaria a bridge `window.miphant` desta janela.
+    sNewWindow.webContents.on('will-navigate', (event, targetUrl) => {
+        if (isInternalUrl(targetUrl)) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (/^https?:/i.test(targetUrl)) {
+            shell.openExternal(targetUrl);
+        }
+    });
 
     sNewWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (url !== '') {
             // URL interna (localhost) — abre nova janela preservando sessão
-            if (url.startsWith('https://localhost') || url.startsWith('http://localhost')) {
+            if (isInternalUrl(url)) {
                 miphantNewWindow(url);
             } else {
                 // URL externa — abre no navegador do sistema
-                require('electron').shell.openExternal(url);
+                shell.openExternal(url);
             }
 
             return { action: 'deny' }
