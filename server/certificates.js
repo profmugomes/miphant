@@ -167,14 +167,8 @@ function createPublicKeyInfo(publicKey) {
 function createSubjectAlternativeName() {
     const dnsLocalhost = der(0x82, Buffer.from('localhost', 'ascii'));
     const ipv4 = der(0x87, Buffer.from([127, 0, 0, 1]));
-    const ipv6 = der(0x87, Buffer.from([
-        0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x01
-    ]));
 
-    return derSequence(dnsLocalhost, ipv4, ipv6);
+    return derSequence(dnsLocalhost, ipv4);
 }
 
 function createExtensions() {

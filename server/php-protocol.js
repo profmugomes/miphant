@@ -107,7 +107,16 @@ function encodePhpParams(params) {
 //     desconectar no meio da resposta.
 // ============================================================
 
-function executePhpProtocol({ host, port, params, body, onStdout, onBackpressure, signal }) {
+function executePhpProtocol({
+    host,
+    port,
+    socketPath,
+    params,
+    body,
+    onStdout,
+    onBackpressure,
+    signal
+}) {
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
         const requestId = nextRequestId++;
@@ -281,7 +290,7 @@ function executePhpProtocol({ host, port, params, body, onStdout, onBackpressure
             fail(new Error('PHP protocol socket timeout'));
         });
 
-        socket.connect(port, host, () => {
+        const onConnect = () => {
             // BEGIN_REQUEST
             const begin = Buffer.alloc(8);
             begin.writeUInt16BE(PHP_PROTOCOL_RESPONDER, 0);
@@ -315,7 +324,14 @@ function executePhpProtocol({ host, port, params, body, onStdout, onBackpressure
             }
 
             socket.write(createPhpRecord(PHP_PROTOCOL_STDIN, requestId));
-        });
+        };
+
+        // Unix socket (Linux, protegido por permissao 0600) ou TCP
+        if (socketPath) {
+            socket.connect({ path: socketPath }, onConnect);
+        } else {
+            socket.connect(port, host, onConnect);
+        }
     });
 }
 

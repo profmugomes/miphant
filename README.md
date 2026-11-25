@@ -8,6 +8,7 @@ MiPhant is a desktop application runner that lets you build and run PHP applicat
 
 - **Cross-platform**: Linux (PHP-FPM) and Windows (PHP-CGI)
 - **Built-in HTTPS server** with auto-generated self-signed certificates
+- **Runtime PSK security**: a new 256-bit key is generated on every launch, so only official MiPhant windows can reach the internal server (see [Security](#security-runtime-psk))
 - **FastCGI protocol** for PHP execution with persistent process management
 - **MiPhantLibs**: PHP library for config, i18n, file operations, dialogs, routing and more
 - **Dark design system** with CSS variables and responsive components
@@ -52,13 +53,14 @@ The `server/` directory contains modular Node.js server components:
 
 | Module | Description |
 |---|---|
-| `http-server.js` | HTTPS server with TLS, static file serving, PHP protocol routing |
-| `php-manager.js` | PHP process lifecycle: start, stop, FPM pool config (Linux), CGI binding (Windows) |
-| `php-protocol.js` | PHP protocol implementation for TCP communication with PHP-FPM/CGI |
-| `config.js` | Centralized configuration: HOST, ports, timeouts, limits |
+| `http-server.js` | HTTPS server with TLS, static file serving, PHP protocol routing, runtime PSK gate |
+| `security.js` | Per-launch PSK: key generation, HKDF subkeys, HTTP authorization, Node→PHP request MAC, memory wipe |
+| `php-manager.js` | PHP process lifecycle: start, stop, FPM pool config (Linux), CGI binding (Windows), guard wiring |
+| `php-protocol.js` | PHP protocol implementation for Unix socket (Linux) and TCP (Windows) communication with PHP-FPM/CGI |
+| `config.js` | Centralized configuration: HOST, ports, timeouts, limits, security constants |
 | `certificates.js` | Auto-generation of self-signed TLS certificates |
 | `logger.js` | Centralized logger with verbose mode controlled by `config.dev.tools` |
-| `utils.js` | Utility functions: free port finder, MIME types, port wait |
+| `utils.js` | Utility functions: free port finder, MIME types, port/socket wait |
 
 ## PHP Execution
 
@@ -66,21 +68,105 @@ The `server/` directory contains modular Node.js server components:
 
 - **Binary**: `php-fpm`
 - **Mode**: Persistent process manager (FPM)
-- **Config**: Dynamically generated `php-fpm.conf` with pool settings
+- **Transport**: Unix socket `<userData>/server/php/php-fpm.sock` with `listen.mode = 0600` (falls back to TCP if the path is too long or the bind fails)
+- **Config**: Dynamically generated `php-fpm.conf` with pool settings and `php_admin_value[auto_prepend_file]` pointing to the security guard
 - **Workers**: Dynamic pool based on CPU cores (2 to 16 children)
-- **Advantages**: Persistent processes, better performance for multiple requests
+- **Advantages**: Persistent processes, better performance for multiple requests, PHP unreachable by other local processes
 
 ### Windows (PHP-CGI)
 
 - **Binary**: `php-cgi.exe`
 - **Mode**: CGI binary bound to a port in FastCGI mode
+- **Transport**: TCP `127.0.0.1:<ephemeral>` (PHP-CGI has no Unix socket support)
 - **Config**: No configuration file needed
-- **Arguments**: `-b 127.0.0.1:<port>`
+- **Arguments**: `-d auto_prepend_file=<guard> -b 127.0.0.1:<port>`
 - **Advantages**: No external dependencies, works out of the box
 
 ### PHP Protocol
 
-Both platforms use the same TCP protocol for communication. The Node.js server sends CGI parameters (request method, headers, query string, script filename, etc.) to the PHP process, which returns HTTP headers and body. The HTTPS server parses the PHP response and forwards it to the Electron renderer.
+Both platforms use the same FastCGI protocol (over a Unix socket on Linux, TCP on Windows). The Node.js server sends CGI parameters (request method, headers, query string, script filename, security MAC, etc.) to the PHP process, which returns HTTP headers and body. The HTTPS server parses the PHP response and forwards it to the Electron renderer.
+
+## Security (Runtime PSK)
+
+MiPhant's internal server listens on loopback and would otherwise be reachable by any local process. To prevent that, **every launch generates a 256-bit pre-shared key (PSK)** that exists only in the main process memory.
+
+### Key lifecycle
+
+1. `server/security.js` calls `crypto.randomBytes(32)` during startup.
+2. Two subkeys are derived with HKDF-SHA256:
+   - `httpKey` (`miphant/http/v1`) — authorizes window → HTTPS server
+   - `phpKey` (`miphant/php/v1`) — authorizes Node → PHP
+3. Keys are stored in `Buffer`s so they can be zeroed.
+4. On shutdown (`before-quit`, `SIGINT`, `SIGTERM`, fatal error) MiPhant stops HTTPS and PHP, removes the Chromium header-injection listener and calls `security.wipe()` (`Buffer.fill(0)` on every key).
+
+Nothing is written to disk, `process.env`, cookies or `contextBridge`. A key from a previous run is useless.
+
+### Window → HTTPS server
+
+Chromium injects `X-MiPhant-Auth: <httpKey hex>` through `session.webRequest.onBeforeSendHeaders`, before the first `loadURL`. The header is added **only** when:
+
+- the request targets the exact HTTPS port of the MiPhant server, and
+- it is the main frame **or** the initiator origin is the MiPhant origin.
+
+That covers the document, `style.css` and images, `fetch`, XHR, `EventSource`/SSE, `HEAD` and preflight. The key never reaches page JavaScript, so XSS cannot steal it.
+
+`server/http-server.js` rejects everything else **before any parsing or I/O**:
+
+- `X-MiPhant-Auth` compared in constant time (SHA-256 digests + `timingSafeEqual`);
+- exact `Host` allowlist (`localhost:<port>`, `127.0.0.1:<port>`) — blocks DNS rebinding;
+- `Origin`, when present, must be the MiPhant origin;
+- `Sec-Fetch-Site: cross-site` or `same-site` is rejected;
+- after 20 failures within 10 s, unauthenticated connections are dropped (authenticated requests are never throttled).
+
+Unauthorized requests receive an empty `404` with `Connection: close` — indistinguishable from a missing route.
+
+### Node → PHP
+
+Each request carries `MIPHANT_PHP_TS`, `MIPHANT_PHP_NONCE` and `MIPHANT_PHP_AUTH`, an HMAC-SHA256 over method, script name, request URI, query string, content length, content type, timestamp and nonce.
+
+The expected key is **not** sent in the request: it lives in the PHP process environment as `MIPHANT_GUARD_KEY`, set by Node when spawning PHP. `app/guard/php-guard.php` is loaded via `auto_prepend_file` and, on every request:
+
+- skips only CLI SAPIs (`cli`, `cli-server`);
+- validates format, timestamp (±30 s) and HMAC with `hash_equals`;
+- removes `MIPHANT_GUARD_KEY`, `MIPHANT_PHP_TS`, `MIPHANT_PHP_NONCE` and `MIPHANT_PHP_AUTH` from `$_SERVER`/`$_ENV` **before** the user script runs, so `phpinfo()` and debug pages never see them;
+- answers `403 Forbidden` with no details on any failure (fail closed).
+
+Because the key is never taken from the request, an attacker connecting directly to the PHP port cannot sign their own request.
+
+### Platform differences
+
+| | Linux | Windows |
+|---|---|---|
+| PHP transport | Unix socket `<userData>/server/php/php-fpm.sock`, `listen.mode = 0600` | TCP `127.0.0.1:<ephemeral>` |
+| Direct access from other processes | Blocked by filesystem permissions | Blocked by the HMAC guard |
+| Extra protection | Guard (defense in depth) | Guard + loopback-only binding |
+
+If the socket path is too long (Flatpak/Snap) or PHP-FPM cannot bind it, MiPhant falls back to TCP and logs a warning; the guard stays active.
+
+### Other protections
+
+- **Certificate pinning**: `setCertificateVerifyProc` accepts only the SHA-256 fingerprint of the MiPhant certificate for `localhost`. A local proxy with its own CA no longer gets through.
+- **No port race**: the HTTPS server binds with `listen(0, '127.0.0.1')` and reads the assigned port from `server.address()`.
+- **IPC validation**: every `ipcMain.handle` checks `event.senderFrame.url` against the MiPhant origin.
+- **Navigation lock**: `will-navigate` blocks anything outside the internal origin and sends real external links to the system browser, so a foreign page can never inherit the `window.miphant` bridge.
+- **Diagnostics restricted**: `/phpinfo` returns `404` unless `dev.tools` is enabled.
+
+### There is no configuration switch
+
+The PSK is **always on**. `app/config.json` has no key, no `enabled` flag and no mode: policy constants live in `server/config.js` and the guard cannot be bypassed. This is intentional — a security feature that a user can turn off is a security feature that will be turned off.
+
+### Threat model
+
+| Protects against | Does **not** protect against |
+|---|---|
+| Other local apps or browsers hitting `https://localhost:<port>` | A same-user process reading memory (`/proc/<pid>/mem`, `ptrace`, debugger) |
+| Port scans followed by requests | Someone with DevTools open (the Network panel shows the header) |
+| CSRF / DNS rebinding from web pages | Root/malware, or swap/hibernation writing memory to disk |
+| Direct FastCGI access to PHP | Local DoS by exhausting connections |
+| Reusing a key after the app closes | |
+| Local MITM with a custom CA | |
+
+For stronger isolation keep `kernel.yama.ptrace_scope >= 1` and never ship builds with `--inspect` or `--remote-debugging-port`.
 
 ## MiPhantLibs
 
@@ -166,6 +252,9 @@ Accessed via `$_ENV` in PHP:
 | `$_ENV['MIPHANT_HOMEDIR']` | User home directory |
 | `$_ENV['MIPHANT_PLATFORM']` | Platform: `'linux'` or `'win32'` |
 | `$_ENV['MIPHANT_ARGV']` | Command-line arguments passed to the app |
+| `$_ENV['MIPHANT_DEV']` | `'1'` when `dev.tools` is enabled, `'0'` otherwise |
+
+> `MIPHANT_GUARD_KEY` is internal to the PHP process: it is used by `app/guard/php-guard.php` and removed from `$_SERVER`/`$_ENV` before your script runs.
 
 ## Configuration
 
@@ -176,7 +265,7 @@ The application is configured via `app/config.json`:
   "app": {
     "id": "miphant",
     "name": "MiPhant",
-    "version": "7.0.0",
+    "version": "7.2.0",
     "width": 800,
     "height": 600,
     "resizable": true,
@@ -194,7 +283,6 @@ The application is configured via `app/config.json`:
     "copyright": "Copyright (C) 2025-2026 Murilo Gomes <profmugomes.com.br>"
   },
   "server": {
-    "perm": true,
     "router": false
   },
   "dev": {
@@ -222,8 +310,9 @@ The application is configured via `app/config.json`:
 - `copyright`: Copyright notice
 
 **server**
-- `perm`: Auto-apply execute permission to PHP binary (Linux)
 - `router`: Enable PHP built-in router
+
+> Security is **not** configurable. The runtime PSK, certificate pinning, IPC validation and the PHP guard are always active; see [Security](#security-runtime-psk).
 
 **dev**
 - `menu`: Show the Dev menu (Build, Refresh, Tools)
@@ -275,7 +364,7 @@ Menus are defined as JSON files in `app/menus/`. The main menu is `menu.json`. E
     },
     "separator1": {},
     "External Link": {
-      "url": "https://example.com"
+      "url": "https://seu-dominio"
     },
     "Run Script": {
       "script": "console.log('hello')"

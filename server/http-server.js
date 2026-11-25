@@ -11,11 +11,12 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
 
-const { exists, findFreePort, getMimeType } = require('./utils');
+const { exists, getMimeType } = require('./utils');
 const { executePhpProtocol, createPhpResponseParser, sanitizeHeaders } = require('./php-protocol');
-const { getPhpPort } = require('./php-manager');
+const { getPhpEndpoint } = require('./php-manager');
 const { log: loggerLog } = require('./logger');
-const { HOST, DEFAULT_HTTPS_PORT, MAX_BODY_SIZE } = require('./config');
+const { HOST, DEFAULT_HTTPS_PORT, MAX_BODY_SIZE, AUTH_HEADER } = require('./config');
+const security = require('./security');
 
 // ============================================================
 // ESTADO
@@ -60,6 +61,33 @@ function getCorsOrigin() {
     return `https://localhost:${httpsPort}`;
 }
 
+// Origem oficial do servidor interno (usada por IPC e navegacao)
+function getServerOrigin() {
+    return httpsServer ? `https://localhost:${httpsPort}` : null;
+}
+
+// ============================================================
+// RESPOSTA PARA REQUISICAO NAO AUTENTICADA
+//
+// 404 sem corpo: indistinguivel de rota inexistente.
+// Apos excesso de falhas, derruba a conexao.
+// ============================================================
+
+function denyUnauthorized(req, res, destroy) {
+    if (destroy) {
+        req.socket.destroy();
+        return;
+    }
+
+    res.writeHead(404, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Length': '0',
+        'Cache-Control': 'no-store',
+        'Connection': 'close'
+    });
+    res.end();
+}
+
 // ============================================================
 // HEADERS BLOQUEADOS PARA CGI (blacklist)
 //
@@ -75,6 +103,20 @@ const CGI_HEADER_BLACKLIST = new Set([
     'x-forwarded-proto',
     'x-real-ip'
 ]);
+
+// Prefixos reservados do MiPhant. Impede que o cliente injete
+// params de autenticacao Node->PHP (anti-spoof).
+const CGI_HEADER_BLACKLIST_PREFIXES = ['x-miphant-', 'miphant-'];
+
+function isBlockedCgiHeader(name) {
+    const lower = name.toLowerCase();
+
+    if (CGI_HEADER_BLACKLIST.has(lower)) {
+        return true;
+    }
+
+    return CGI_HEADER_BLACKLIST_PREFIXES.some(prefix => lower.startsWith(prefix));
+}
 
 // ============================================================
 // LEITURA DO BODY DA REQUISICAO
@@ -163,13 +205,17 @@ function createCgiParameters(req, filePath, serverPort, isRouted) {
             continue;
         }
 
-        if (CGI_HEADER_BLACKLIST.has(name.toLowerCase())) {
+        if (isBlockedCgiHeader(name)) {
             continue;
         }
 
         const envName = 'HTTP_' + name.toUpperCase().replace(/-/g, '_');
         params[envName] = Array.isArray(value) ? value.join(', ') : String(value);
     }
+
+    // Autenticacao Node -> PHP: injetada DEPOIS do loop de headers,
+    // para que nada vindo do cliente possa sobrescrever.
+    Object.assign(params, security.createPhpAuthParams(params));
 
     return params;
 }
@@ -283,9 +329,18 @@ async function executePhp(req, res, filePath, serverPort, isRouted) {
 
         let drainRegistered = false;
 
+        const endpoint = getPhpEndpoint();
+
+        if (!endpoint) {
+            throw new Error('PHP endpoint indisponivel.');
+        }
+
+        const target = endpoint.type === 'unix'
+            ? { socketPath: endpoint.path }
+            : { host: endpoint.host, port: endpoint.port };
+
         const result = await executePhpProtocol({
-            host: HOST,
-            port: getPhpPort(),
+            ...target,
             params,
             body,
             signal: controller.signal,
@@ -399,12 +454,22 @@ async function serveStatic(req, res, filePath) {
 // ============================================================
 
 async function handleRequest(req, res) {
+    // GATE DE AUTENTICACAO — antes de OPTIONS, de parsing de URL,
+    // de resolver caminho ou de qualquer I/O.
+    const authorization = security.authorizeHttp(req, { port: httpsPort });
+
+    if (!authorization.allowed) {
+        denyUnauthorized(req, res, authorization.destroy);
+        return;
+    }
+
     // CORS / OPTIONS
     if (req.method === 'OPTIONS') {
         res.writeHead(204, {
             'Access-Control-Allow-Origin': getCorsOrigin(),
             'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            'Access-Control-Allow-Headers': `Content-Type, Authorization, ${AUTH_HEADER}`,
+            'Access-Control-Max-Age': '600'
         });
         res.end();
         return;
@@ -499,8 +564,6 @@ async function startHttpsServer(certificate) {
         cert: fs.readFileSync(certificate.cert)
     };
 
-    httpsPort = await findFreePort(HOST);
-
     httpsServer = https.createServer(tlsOptions, (req, res) => {
         handleRequest(req, res).catch(error => {
             console.error('[HTTP]', error);
@@ -517,10 +580,20 @@ async function startHttpsServer(certificate) {
 
     await new Promise((resolve, reject) => {
         httpsServer.once('error', reject);
-        httpsServer.listen(httpsPort, HOST, () => {
+        // Porta 0: o SO escolhe e ja entrega o socket escutando.
+        // Elimina a janela TOCTOU do antigo findFreePort().
+        httpsServer.listen(0, HOST, () => {
             resolve();
         });
     });
+
+    const address = httpsServer.address();
+
+    if (!address || typeof address === 'string') {
+        throw new Error('Nao foi possivel obter a porta do servidor HTTPS.');
+    }
+
+    httpsPort = address.port;
 
     loggerLog(`[HTTPS] https://localhost:${httpsPort}`);
 
@@ -574,6 +647,16 @@ function stopHttps() {
         };
 
         server.close(done);
+
+        // Encerra keep-alive/SSE pendurados para o shutdown nao travar
+        if (typeof server.closeIdleConnections === 'function') {
+            server.closeIdleConnections();
+        }
+
+        if (typeof server.closeAllConnections === 'function') {
+            server.closeAllConnections();
+        }
+
         setTimeout(done, 3000);
     });
 }
@@ -595,5 +678,7 @@ module.exports = {
     stopHttps,
     setPublicRoot,
     getHttpsPort,
-    setRouter
+    getServerOrigin,
+    setRouter,
+    createCgiParameters
 };

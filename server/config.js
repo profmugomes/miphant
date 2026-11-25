@@ -21,7 +21,27 @@ const SERVER_CONFIG = {
     PHP_STREAM_MAX_DURATION: 310000,
     PHP_MAX_RESPONSE_SIZE: 50 * 1024 * 1024,
     // Teto para o acumulo de stderr (warnings de scripts longos)
-    PHP_MAX_STDERR_SIZE: 1024 * 1024
+    PHP_MAX_STDERR_SIZE: 1024 * 1024,
+
+    // ============================================================
+    // SEGURANCA (PSK DINAMICA)
+    //
+    // ESTES VALORES SAO INTERNOS E FIXOS DE PROPOSITO.
+    // Nao existe chave em app/config.json: a protecao nao pode
+    // ser desligada nem ajustada pelo usuario do aplicativo.
+    // ============================================================
+
+    // Header injetado pelo Chromium em toda requisicao da janela
+    AUTH_HEADER: 'x-miphant-auth',
+    // 32 bytes = 256 bits de entropia (64 caracteres hex)
+    AUTH_KEY_BYTES: 32,
+    // Tolerancia do timestamp da MAC Node->PHP (segundos)
+    AUTH_CLOCK_SKEW: 30,
+    // Bloqueio por excesso de falhas de autenticacao
+    AUTH_MAX_FAILURES: 20,
+    AUTH_FAILURE_WINDOW: 10000,
+    // Limite pratico de sun_path no Linux (108 bytes, com margem)
+    PHP_SOCKET_MAX_PATH: 100
 };
 
 module.exports = SERVER_CONFIG;

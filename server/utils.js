@@ -93,6 +93,40 @@ function waitForPort(host, port, timeout = 10000) {
 }
 
 // ============================================================
+// AGUARDAR UNIX SOCKET
+// ============================================================
+
+function waitForSocket(socketPath, timeout = 10000) {
+    return new Promise((resolve, reject) => {
+        const started = Date.now();
+
+        function attempt() {
+            if (Date.now() - started > timeout) {
+                reject(new Error(`Timeout aguardando socket ${socketPath}`));
+                return;
+            }
+
+            const socket = net.createConnection({ path: socketPath });
+
+            const retry = () => {
+                socket.destroy();
+                setTimeout(attempt, 100);
+            };
+
+            socket.once('connect', () => {
+                socket.destroy();
+                resolve();
+            });
+
+            socket.once('error', retry);
+            socket.once('timeout', retry);
+        }
+
+        attempt();
+    });
+}
+
+// ============================================================
 // TIPOS MIME (constante global — não recria a cada chamada)
 // ============================================================
 
@@ -130,6 +164,7 @@ module.exports = {
     sleep,
     findFreePort,
     waitForPort,
+    waitForSocket,
     getMimeType,
     MIME_TYPES
 };
