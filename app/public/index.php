@@ -102,6 +102,10 @@ $rt->get('/translate', function() {
     require_once(__DIR__ . '/translate.php');
 });
 
+$rt->get('/controls', function() {
+    require_once(__DIR__ . '/controls.php');
+});
+
 if ($rt->noPHP()) {
     return false;
 }
